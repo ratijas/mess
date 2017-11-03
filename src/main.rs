@@ -1,22 +1,23 @@
 //!
 //! server constructors, types:
 //! - `Vector<T>`
-//! - `Update`
-//!     * `TextUpdate(from, to, coding, compression, text: string) = Update`
-//!     * `FileUpdate(from, to, coding, compression, file: FileMeta) = Update`
 //!
 //! - `User`
 //!     * `user username:string = User`
 //!
 //! - `LoginResult`
-//!     * `loginOk username:string = LoginResult`
-//!     * `loginErr = LoginResult`
+//!     * `LoginOk username:string = LoginResult`
+//!     * `LoginErr = LoginResult`
 //!
 //! - `Online`
 //!     * `online users:Vector<User> = Online`
 //!
 //! - `Updates`
-//!     * `updates updates:Vector<Update> = Updates`
+//!     * `Updates updates:Vector<Update> = Updates`
+//!
+//! - `Update`
+//!     * `TextUpdate from:Username to:Username coding:string compression:string text:string = Update`
+//!     * `FileUpdate from:Username to:Username coding:string compression:string file:string) = Update`
 //!
 //! server methods:
 //!
