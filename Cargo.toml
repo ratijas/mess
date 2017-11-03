@@ -1,0 +1,15 @@
+[package]
+name = "server"
+version = "0.1.0"
+authors = ["valeev-aidar <ai.valeev@innopolis.ru>"]
+
+[dependencies]
+iron = "^0.5"
+router = "^0.5"
+persistent = "^0.3"
+
+typemap = "0.3.3"
+
+serde = "^1.0"
+serde_derive = "^1.0"
+serde_json = "^1.0"
