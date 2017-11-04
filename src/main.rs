@@ -17,13 +17,12 @@
 //!
 //! - `Update`
 //!     * `TextUpdate from:Username to:Username coding:string compression:string text:string = Update`
-//!     * `FileUpdate from:Username to:Username coding:string compression:string file:string) = Update`
+//!     * `FileUpdate from:Username to:Username coding:string compression:string file:string = Update`
 //!
 //! server methods:
-//!
 //! - `login username:string = LoginResult`
 //! - `online username:string = Online`
-//! - `getUpdates = Updates`
+//! - `getUpdates username:string  = Updates`
 //!
 //!
 #[allow(unused)]
@@ -63,14 +62,7 @@ pub struct App {
 #[derive(Debug)]
 pub struct User {
     pub username: Username,
-    pub inbox: VecDeque<Message>,
-}
-
-#[derive(Debug)]
-pub struct Message {
-    from: String,
-    to: String,
-    text: String,
+    pub inbox: VecDeque<Update>,
 }
 
 pub struct JsonKey;
@@ -114,6 +106,7 @@ fn main() {
 
     router.get("/login", handle_method::<Login>, "login");
     router.get("/online", handle_method::<GetOnline>, "online");
+    router.get("/getUpdates", handle_method::<GetUpdates>, "getUpdates");
 
     let mut chain = Chain::new(router);
     chain.link(State::<App>::both(App::new()));
@@ -185,6 +178,7 @@ fn handle_method<M: Method>(req: &mut Request) -> IronResult<Response> {
 }
 
 pub mod types {
+    use std::collections::VecDeque;
     pub type Username = String;
 
     #[derive(Clone, Debug)]
@@ -200,6 +194,21 @@ pub mod types {
     #[serde(untagged)]
     pub enum Online {
         Online { users: Vec<Username> }
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum Update {
+        TextUpdate { from:Username, to:Username, coding:String, compression:String, text:String },
+        FileUpdate { from:Username, to:Username, coding:String, compression:String, file:String },
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum Updates {
+        Updates { updates: VecDeque<Update> }
     }
 }
 
@@ -234,13 +243,31 @@ pub mod methods {
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
-    pub struct GetOnline;
+    pub struct GetOnline {
+        pub username: Username,
+    }
 
     impl Method for GetOnline {
         type Answer = Online;
 
         fn invoke(self, app: &mut App) -> Online {
             Online::Online { users: app.users.keys().cloned().collect() }
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    pub struct GetUpdates {
+        pub username: Username,
+    }
+
+    impl Method for GetUpdates {
+        type Answer = Updates;
+
+        fn invoke(self, app: &mut App) -> Updates {
+            let result = Updates::Updates { updates: app.users.get(&self.username).unwrap().inbox.clone() };
+            app.users.get_mut(&self.username).unwrap().inbox.clear();
+            result
         }
     }
 }
