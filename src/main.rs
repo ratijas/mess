@@ -318,6 +318,7 @@ pub mod methods {
                 }
                 &Update::FileUpdate {ref to, ..} => {
                     app.users.get_mut(to).unwrap().inbox.push_back(self.update.clone());
+                    //TODO
                     SentUpdate::SentFile { file_id: 1 }
                 }
             }
@@ -342,7 +343,7 @@ pub mod methods {
         type Answer = bool;
 
         fn invoke(self, app: &mut App) -> bool {
-            true
+            true//TODO
         }
     }
 }
