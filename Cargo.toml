@@ -1,0 +1,7 @@
+[package]
+name = "algos"
+version = "0.1.0"
+authors = ["ivan tkachenko <ratijas@users.noreply.github.com>"]
+
+[dependencies]
+bit-vec = "0.4.4"
