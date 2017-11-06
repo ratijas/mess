@@ -9,15 +9,12 @@
 //!
 //! - `Vector<T>`
 //!
-//! - `User`
-//!     * `User username:string = User`
-//!
 //! - `LoginResult`
 //!     * `LoginOk username:string = LoginResult`
 //!     * `LoginErr = LoginResult`
 //!
 //! - `Online`
-//!     * `Online users:Vector<User> = Online`
+//!     * `Online users:Vector<Username> = Online`
 //!
 //! - `Updates`
 //!     * `Updates updates:Vector<Update> = Updates`
