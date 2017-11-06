@@ -24,11 +24,13 @@
 //!
 //! - `Update`
 //!     * `TextUpdate from:Username to:Username coding:string compression:string text:string = Update`
-//!     * `FileUpdate from:Username to:Username coding:string compression:string file:string = Update`
+//!     * `FileUpdate from:Username to:Username coding:string compression:string file:FileMeta file_id:FileId = Update`
 //!
-//! - `SentUpdate`
-//!     * `SentText = SentUpdate`
-//!     * `SentFile file_id:int = SentUpdate`
+//! - `FileMeta`:
+//!     * `FileMeta name:string size:int mime:string = FileMeta`
+//!
+//! - `FileId`
+//!     * `FileId file_id:int = FileId`
 //!
 //! - `Payload`
 //!     * `Payload file_id:int data:bytes = Payload`
@@ -38,8 +40,10 @@
 //! - `login username:string = LoginResult`
 //! - `online username:string = Online`
 //! - `getUpdates username:string = Updates`
-//! - `send update:Update = SentUpdate`
-//! - `uploadFile file_id:int bytes:bytes = Bool`
+//! - `sendText from:Username to:Username coding:string compression:string text:string = Bool`
+//! - `sendFile from:Username to:Username coding:string compression:string file:FileMeta = FileId`
+//! - `uploadFile file_id:FileId bytes:bytes = Bool`
+//! - `downloadFile file_id:FileId = bytes`
 //!
 //!
 #[allow(unused)]
@@ -74,6 +78,8 @@ use methods::*;
 #[derive(Debug)]
 pub struct App {
     pub users: HashMap<Username, User>,
+    //    pub pending: Vec<FileId>,
+    //    pub files: HashMap<_, _>,
 }
 
 #[derive(Debug)]
@@ -119,11 +125,11 @@ impl User {
 
 fn main() {
     let mut router = router::Router::new();
-    router.get("/", default, "default");
+    router.post("/", default, "default");
 
-    router.get("/login", handle_method::<Login>, "login");
-    router.get("/online", handle_method::<GetOnline>, "online");
-    router.get("/getUpdates", handle_method::<GetUpdates>, "getUpdates");
+    router.post("/login", handle_method::<Login>, "login");
+    router.post("/online", handle_method::<GetOnline>, "online");
+    router.post("/getUpdates", handle_method::<GetUpdates>, "getUpdates");
 
     let mut chain = Chain::new(router);
     chain.link(State::<App>::both(App::new()));
@@ -196,6 +202,7 @@ fn handle_method<M: Method>(req: &mut Request) -> IronResult<Response> {
 
 pub mod types {
     use std::collections::VecDeque;
+
     pub type Username = String;
 
     #[derive(Clone, Debug)]
@@ -223,6 +230,12 @@ pub mod types {
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
+    pub struct FileId {
+        file_id: i32,
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum Updates {
         Updates { updates: VecDeque<Update> }
@@ -233,14 +246,14 @@ pub mod types {
     #[serde(untagged)]
     pub enum SentUpdate {
         SentText,
-        SentFile { file_id:i32 }
+        SentFile { file_id: i32 }
     }
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum Payload {
-        Payload { file_id:i32, data:String }
+        Payload { file_id: i32, data: String }
     }
 }
 
@@ -275,7 +288,7 @@ pub mod methods {
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
-    pub struct GetOnline{}
+    pub struct GetOnline {}
 
     impl Method for GetOnline {
         type Answer = Online;
@@ -312,11 +325,11 @@ pub mod methods {
 
         fn invoke(self, app: &mut App) -> SentUpdate {
             match &self.update {
-                &Update::TextUpdate {ref to, ..} => {
+                &Update::TextUpdate { ref to, .. } => {
                     app.users.get_mut(to).unwrap().inbox.push_back(self.update.clone());
                     SentUpdate::SentText
                 }
-                &Update::FileUpdate {ref to, ..} => {
+                &Update::FileUpdate { ref to, .. } => {
                     app.users.get_mut(to).unwrap().inbox.push_back(self.update.clone());
                     //TODO
                     SentUpdate::SentFile { file_id: 1 }
@@ -335,8 +348,8 @@ pub mod methods {
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
     pub struct UploadFile {
-        pub file_id:i32,
-        pub bytes:String,
+        pub file_id: i32,
+        pub bytes: String,
     }
 
     impl Method for UploadFile {
