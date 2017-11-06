@@ -38,8 +38,8 @@
 //! - `online username:string = Online`
 //! - `getUpdates username:string = Updates`
 //! - `sendText from:Username to:Username coding:string compression:string text:string = Bool`
-//! - `sendFile from:Username to:Username coding:string compression:string file:FileMeta = SentFile`
-//! - `uploadFile file_id:FileId bytes:bytes = Bool`
+//! - `sendFile = FileId`
+//! - `uploadFile from:Username to:Username coding:string compression:string file:FileMeta file_id:FileId bytes:bytes = Bool`
 //! - `downloadFile file_id:FileId = bytes`
 //!
 //!
@@ -255,12 +255,14 @@ pub mod types {
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
+    #[serde(untagged)]
     pub enum FileMeta {
         FileMeta { name:String, size:i32, mime:String }
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     #[derive(Serialize, Deserialize)]
+    #[serde(untagged)]
     pub enum FileId {
         FileId { file_id: i32 }
     }
