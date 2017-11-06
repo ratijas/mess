@@ -1,5 +1,12 @@
 //!
 //! server constructors, types:
+//! - `int = i32`
+//! - `Bool`
+//!     * `True = Bool`
+//!     * `False = Bool`
+//! - `bytes`
+//!     * b64 encoded string
+//!
 //! - `Vector<T>`
 //!
 //! - `User`
@@ -19,10 +26,20 @@
 //!     * `TextUpdate from:Username to:Username coding:string compression:string text:string = Update`
 //!     * `FileUpdate from:Username to:Username coding:string compression:string file:string = Update`
 //!
+//! - `SentUpdate`
+//!     * `SentText = SentUpdate`
+//!     * `SentFile file_id:int = SentUpdate`
+//!
+//! - `Payload`
+//!     * `Payload file_id:int data:bytes = Payload`
+//!
+//!
 //! server methods:
 //! - `login username:string = LoginResult`
 //! - `online username:string = Online`
-//! - `getUpdates username:string  = Updates`
+//! - `getUpdates username:string = Updates`
+//! - `send update:Update = SentUpdate`
+//! - `uploadFile file_id:int bytes:bytes = Bool`
 //!
 //!
 #[allow(unused)]
@@ -210,6 +227,21 @@ pub mod types {
     pub enum Updates {
         Updates { updates: VecDeque<Update> }
     }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum SentUpdate {
+        SentText,
+        SentFile { file_id:i32 }
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum Payload {
+        Payload { file_id:i32, data:String }
+    }
 }
 
 pub mod methods {
@@ -243,9 +275,7 @@ pub mod methods {
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
-    pub struct GetOnline {
-        pub username: Username,
-    }
+    pub struct GetOnline{}
 
     impl Method for GetOnline {
         type Answer = Online;
@@ -268,6 +298,51 @@ pub mod methods {
             let result = Updates::Updates { updates: app.users.get(&self.username).unwrap().inbox.clone() };
             app.users.get_mut(&self.username).unwrap().inbox.clear();
             result
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    pub struct Send {
+        pub update: Update,
+    }
+
+    impl Method for Send {
+        type Answer = SentUpdate;
+
+        fn invoke(self, app: &mut App) -> SentUpdate {
+            match &self.update {
+                &Update::TextUpdate {ref to, ..} => {
+                    app.users.get_mut(to).unwrap().inbox.push_back(self.update.clone());
+                    SentUpdate::SentText
+                }
+                &Update::FileUpdate {ref to, ..} => {
+                    app.users.get_mut(to).unwrap().inbox.push_back(self.update.clone());
+                    SentUpdate::SentFile { file_id: 1 }
+                }
+            }
+            /*
+                pub enum SentUpdate {
+                    SentText,
+                    SentFile { file_id:i32 }
+                }
+            //   * `TextUpdate from:Username to:Username coding:string compression:string text:string = Update`
+            //   * `FileUpdate from:Username to:Username coding:string compression:string file:string = Update`*/
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    pub struct UploadFile {
+        pub file_id:i32,
+        pub bytes:String,
+    }
+
+    impl Method for UploadFile {
+        type Answer = bool;
+
+        fn invoke(self, app: &mut App) -> bool {
+            true
         }
     }
 }
