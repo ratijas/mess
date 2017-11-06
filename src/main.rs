@@ -32,16 +32,13 @@
 //! - `FileId`
 //!     * `FileId file_id:int = FileId`
 //!
-//! - `Payload`
-//!     * `Payload file_id:int data:bytes = Payload`
-//!
 //!
 //! server methods:
 //! - `login username:string = LoginResult`
 //! - `online username:string = Online`
 //! - `getUpdates username:string = Updates`
 //! - `sendText from:Username to:Username coding:string compression:string text:string = Bool`
-//! - `sendFile from:Username to:Username coding:string compression:string file:FileMeta = FileId`
+//! - `sendFile from:Username to:Username coding:string compression:string file:FileMeta = SentFile`
 //! - `uploadFile file_id:FileId bytes:bytes = Bool`
 //! - `downloadFile file_id:FileId = bytes`
 //!
@@ -68,6 +65,7 @@ use iron::prelude::*;
 use iron::status;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 
 use std::io::Read;
@@ -78,14 +76,21 @@ use methods::*;
 #[derive(Debug)]
 pub struct App {
     pub users: HashMap<Username, User>,
-    //    pub pending: Vec<FileId>,
-    //    pub files: HashMap<_, _>,
+    pub pending: HashSet<FileId>,
+    pub files: HashMap<FileId, File>,
+    pub last_id: i32,
 }
 
 #[derive(Debug)]
 pub struct User {
     pub username: Username,
     pub inbox: VecDeque<Update>,
+}
+
+#[derive(Debug)]
+pub struct File {
+    pub meta: FileMeta,
+    pub content: String,
 }
 
 pub struct JsonKey;
@@ -97,7 +102,10 @@ impl Key for App { type Value = App; }
 impl App {
     pub fn new() -> Self {
         App {
-            users: HashMap::new()
+            users: HashMap::new(),
+            pending: HashSet::new(),
+            files: HashMap::new(),
+            last_id: 0,
         }
     }
 
@@ -130,6 +138,10 @@ fn main() {
     router.post("/login", handle_method::<Login>, "login");
     router.post("/online", handle_method::<GetOnline>, "online");
     router.post("/getUpdates", handle_method::<GetUpdates>, "getUpdates");
+    router.post("/sendText", handle_method::<SendText>, "sendText");
+    router.post("/sendFile", handle_method::<SendFile>, "sendFile");
+    router.post("/uploadFile", handle_method::<UploadFile>, "uploadFile");
+    router.post("/downloadFile", handle_method::<DownloadFile>, "downloadFile");
 
     let mut chain = Chain::new(router);
     chain.link(State::<App>::both(App::new()));
@@ -190,8 +202,6 @@ fn handle_method<M: Method>(req: &mut Request) -> IronResult<Response> {
         let lock = req.get::<State<App>>().unwrap();
         let mut app = lock.write().unwrap();
 
-        println!("app: {:?}", &*app);
-
         m.invoke(&mut app)
     };
 
@@ -225,13 +235,7 @@ pub mod types {
     #[serde(untagged)]
     pub enum Update {
         TextUpdate { from:Username, to:Username, coding:String, compression:String, text:String },
-        FileUpdate { from:Username, to:Username, coding:String, compression:String, file:String },
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    pub struct FileId {
-        file_id: i32,
+        FileUpdate { from:Username, to:Username, coding:String, compression:String, file:FileMeta , file_id:FileId },
     }
 
     #[derive(Clone, Debug)]
@@ -251,9 +255,14 @@ pub mod types {
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum Payload {
-        Payload { file_id: i32, data: String }
+    pub enum FileMeta {
+        FileMeta { name:String, size:i32, mime:String }
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    #[derive(Serialize, Deserialize)]
+    pub enum FileId {
+        FileId { file_id: i32 }
     }
 }
 
@@ -316,38 +325,48 @@ pub mod methods {
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
-    pub struct Send {
-        pub update: Update,
+    pub struct SendText {
+        pub from: Username,
+        pub to: Username,
+        pub coding: String,
+        pub compression: String,
+        pub text: String,
     }
 
-    impl Method for Send {
-        type Answer = SentUpdate;
+    impl Method for SendText {
+        type Answer = bool;
 
-        fn invoke(self, app: &mut App) -> SentUpdate {
-            match &self.update {
-                &Update::TextUpdate { ref to, .. } => {
-                    app.users.get_mut(to).unwrap().inbox.push_back(self.update.clone());
-                    SentUpdate::SentText
-                }
-                &Update::FileUpdate { ref to, .. } => {
-                    app.users.get_mut(to).unwrap().inbox.push_back(self.update.clone());
-                    //TODO
-                    SentUpdate::SentFile { file_id: 1 }
-                }
-            }
-            /*
-                pub enum SentUpdate {
-                    SentText,
-                    SentFile { file_id:i32 }
-                }
-            //   * `TextUpdate from:Username to:Username coding:string compression:string text:string = Update`
-            //   * `FileUpdate from:Username to:Username coding:string compression:string file:string = Update`*/
+        fn invoke(self, app: &mut App) -> bool {
+            if self.to == self.from || !app.users.contains_key(&self.to) { return false };
+            app.users.get_mut(&self.to).unwrap().inbox.push_back(Update::TextUpdate
+                { from: self.from, to: self.to, coding: self.coding, compression: self.compression, text: self.text });
+            true
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    pub struct SendFile {}
+
+    impl Method for SendFile {
+        type Answer = FileId;
+
+        fn invoke(self, app: &mut App) -> FileId {
+            let file_id = FileId::FileId { file_id: app.last_id };
+            app.last_id += 1;
+            app.pending.insert(file_id.clone());
+            file_id
         }
     }
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
     pub struct UploadFile {
+        pub from: Username,
+        pub to: Username,
+        pub coding: String,
+        pub compression: String,
+        pub file: FileMeta,
         pub file_id: i32,
         pub bytes: String,
     }
@@ -356,7 +375,28 @@ pub mod methods {
         type Answer = bool;
 
         fn invoke(self, app: &mut App) -> bool {
-            true//TODO
+            if self.to == self.from || !app.users.contains_key(&self.to) { return false };
+            if !app.pending.contains(&FileId::FileId { file_id: self.file_id }) ||
+                app.files.contains_key(&FileId::FileId { file_id: self.file_id }) { return false };
+            app.files.insert(FileId::FileId { file_id: self.file_id }, File { meta: self.file.clone() , content: self.bytes });
+            app.pending.remove(&FileId::FileId { file_id: self.file_id });
+            app.users.get_mut(&self.to).unwrap().inbox.push_back(Update::FileUpdate
+                { from: self.from, to: self.to, coding: self.coding, compression: self.compression, file: self.file, file_id: FileId::FileId { file_id: self.file_id } });
+            true
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    pub struct DownloadFile {
+        pub file_id: i32,
+    }
+
+    impl Method for DownloadFile {
+        type Answer = String;
+
+        fn invoke(self, app: &mut App) -> String {
+            app.files.get(&FileId::FileId { file_id: self.file_id}).unwrap().content.clone()
         }
     }
 }
