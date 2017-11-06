@@ -10,14 +10,14 @@
 //! - `Vector<T>`
 //!
 //! - `User`
-//!     * `user username:string = User`
+//!     * `User username:string = User`
 //!
 //! - `LoginResult`
 //!     * `LoginOk username:string = LoginResult`
 //!     * `LoginErr = LoginResult`
 //!
 //! - `Online`
-//!     * `online users:Vector<User> = Online`
+//!     * `Online users:Vector<User> = Online`
 //!
 //! - `Updates`
 //!     * `Updates updates:Vector<Update> = Updates`
@@ -35,7 +35,7 @@
 //!
 //! server methods:
 //! - `login username:string = LoginResult`
-//! - `online username:string = Online`
+//! - `online = Online`
 //! - `getUpdates username:string = Updates`
 //! - `sendText from:Username to:Username coding:string compression:string text:string = Bool`
 //! - `sendFile = FileId`
