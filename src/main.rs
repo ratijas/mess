@@ -12,6 +12,7 @@ extern crate serde;
 extern crate serde_derive;
 // #[macro_use]
 extern crate serde_json;
+extern crate base64;
 
 
 use std::io::{self, Write};
@@ -37,23 +38,45 @@ fn main() {
         println!("{}. {}", i + 1, user);
     }
 
-    let _peer = prompt("select peer to start chatting: ").unwrap();
+    let peer = prompt("select peer to start chatting: ").unwrap();
 
-    let upd = types::Update::TextUpdate {
-        from: username.clone(),
-        to: String::new(),
-        coding: String::new(),
-        compression: String::new(),
-        text: "hello".as_bytes().to_vec(),
-    };
-    let ser = serde_json::to_string(&upd).unwrap();
-    println!("text update: {:?}", ser);
+    let username_clone = username.clone();
+    let gui_clone = gui.clone();
+    let _ = ::std::thread::spawn(move || {
+        loop {
+            ::std::thread::sleep(::std::time::Duration::from_secs(1));
+            let updates: types::Updates = (methods::GetUpdates { username: username_clone.clone() }).invoke(&gui_clone.connection).unwrap();
 
-    let upds: types::Updates = (methods::GetUpdates { username: username.clone() }).invoke(&gui.connection).unwrap();
-    println!("updates: {:?}", upds);
+            let updates: Vec<types::Update> = match updates {
+                types::Updates::Updates { updates } => updates
+            };
 
-//    let msg = prompt("type a message: ");
+            for update in updates {
+                match update {
+                    types::Update::TextUpdate {
+                        from, text, ..
+                    } => {
+                        let base = base64::decode(&text).unwrap();
+                        let text = ::std::str::from_utf8(&base).unwrap();
+                        println!();
+                        println!("new message from {}: {}", from, text);
+                    }
+                }
+            }
+        }
+    });
 
+    loop {
+        let msg = prompt("type a message: ").unwrap();
+        let sent = (methods::SendText {
+            from: username.clone(),
+            to: peer.clone(),
+            coding: String::new(),
+            compression: String::new(),
+            text: msg.into_bytes(),
+        }).invoke(&gui.connection).unwrap();
+        println!("sent: {}", sent);
+    }
 }
 
 fn prompt<I: ::std::fmt::Display>(prompt: I) -> Result<String, io::Error> {

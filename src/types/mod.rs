@@ -21,7 +21,7 @@ pub use self::updates::Updates;
 pub type Username = String;
 
 
-mod base64 {
+pub mod base64 {
     extern crate base64;
     use serde::{Serializer, de, Deserialize, Deserializer};
 

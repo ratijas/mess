@@ -6,9 +6,11 @@
 //! - `uploadFile file_id:FileId bytes:bytes = Bool`
 //! - `downloadFile file_id:FileId = bytes`
 
+use std::str;
+use std::io::Read;
+
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 
 use reqwest;
 
@@ -17,40 +19,50 @@ use super::connection::Connection;
 pub mod login;
 pub mod online;
 pub mod get_updates;
+pub mod send_text;
 
 pub use self::login::Login;
 pub use self::online::Online;
 pub use self::get_updates::GetUpdates;
+pub use self::send_text::SendText;
 
+pub use super::types::base64;
+pub use super::types::Username;
 
 pub trait Method: Serialize {
-    type Answer: DeserializeOwned;
+    type Answer: DeserializeOwned + ::std::fmt::Debug;
 
     fn endpoint(&self) -> &'static str;
 
     fn invoke(&self, conn: &Connection) -> Result<Self::Answer, ()> {
+        // println!("request: {}", ::serde_json::to_string(&self).unwrap());
         let res = conn.post(self.endpoint(), &self);
 
-        // println!("response: {:?}", res);
+        let mut body = Vec::new();
+        res.map_err(drop)?.read_to_end(&mut body).map_err(drop)?;
+        let body = str::from_utf8(&body).map_err(drop)?;
 
-        let mut value: Value = res
-            .map_err(drop)?
-            .json()
-            .map_err(drop)?;
+        // println!("response: {}", body);
 
-        // println!("value: {:?}", value);
+        let json: GeneralAnswer<Self::Answer> = ::serde_json::from_str(body).map_err(drop)?;
 
-        let obj = value.as_object_mut().ok_or(())?;
-        let ok = obj.remove("ok").ok_or(())?;
-        if !ok.as_bool().unwrap_or(false) {
+        // println!("json: {:?}", json);
+
+        if !json.ok {
             return Err(());
         }
-        let result = obj.remove("result").ok_or(())?;
-        // println!("result: {:?}", result);
-        ::serde_json::from_value::<Self::Answer>(result).map_err(drop)
+        Ok(json.result.ok_or(())?)
     }
 
     fn invoke_raw(&self, conn: &Connection) -> reqwest::Result<reqwest::Response> {
         conn.post(self.endpoint(), &self)
     }
+}
+
+#[derive(Debug)]
+#[derive(Deserialize)]
+struct GeneralAnswer<T: ::std::fmt::Debug> {
+    ok: bool,
+    result: Option<T>,
+    description: Option<String>,
 }

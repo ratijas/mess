@@ -1,6 +1,8 @@
 //! Console client for Mess
 use ::connection::Connection;
 
+
+#[derive(Clone)]
 pub struct Client {
     pub connection: Connection,
 }

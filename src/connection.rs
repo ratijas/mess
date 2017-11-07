@@ -4,6 +4,7 @@ use reqwest;
 
 use serde::Serialize;
 
+#[derive(Clone)]
 pub struct Connection {
     host: String,
     port: u16,
