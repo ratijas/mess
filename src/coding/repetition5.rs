@@ -10,10 +10,9 @@ pub const N: usize = 5;
 
 impl Coding for Repetition5 {
     fn encode(&self, input: BitVec) -> BitVec {
-        let len = input.iter().count();
-        let result_len = len * 5;
+        let result_len = input.len() * 5;
         let mut result = BitVec::from_elem(result_len, false);
-        for i in 0..len {
+        for i in 0..(input.len()) {
             if let Some(bit) = input.get(i) {
                 let j = i * 5;
                 result.set(j, bit);
@@ -36,7 +35,7 @@ impl Coding for Repetition5 {
         for i in 0..result_len {
             let mut count = 0;
 
-            while j / 5 < i + 1 {
+            while j / N < i + 1 {
                 if let Some(bit) = input.get(j) {
                     if bit {
                         count += 1;
@@ -63,14 +62,19 @@ mod test {
 
     #[test]
     fn test() {
-        let mut code = BitVec::from_bytes(&[8u8, 6u8]);
-        println!("{:?}", code);
-        code = Repetition5.encode(BitVec::from_bytes(&[8u8, 6u8]));
-        println!("{:?}", code);
+        let msg = BitVec::from_bytes(&[8u8, 6u8]);
+        let mut code = Repetition5.encode(msg.clone());
+
+        assert_eq!(msg.len(), (2 * 8));
+        assert_eq!(code.len(), 5 * msg.len());
+
+        // flip some bits
         code.set(7, true);
         code.set(8, true);
-        println!("{:?}", code);
-        let (code, _vec) = Repetition5.decode(code);
-        println!("{:?}", code);
+
+        let (decoded, stats) = Repetition5.decode(code);
+        assert_eq!(msg, decoded);
+        assert_eq!(1, stats.detected);
+        assert_eq!(1, stats.corrected);
     }
 }

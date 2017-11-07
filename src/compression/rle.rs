@@ -236,7 +236,7 @@ mod test {
         assert_eq!(&*Rle.compress(seq.into_iter()).unwrap().to_bytes(),
                    &*expected);
 
-        assert_eq!(&*Rle.compress(b"".to_vec()).unwrap().to_bytes(), []);
+        assert_eq!(Rle.compress(b"".to_vec()).unwrap().to_bytes(), &[0u8; 0]);
     }
 
     #[test]

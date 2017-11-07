@@ -33,7 +33,7 @@ impl Coding for Repetition3 {
         for i in 0..result_len {
             let mut count = 0;
 
-            while j / 3 < i + 1 {
+            while j / N < i + 1 {
                 if let Some(bit) = input.get(j) {
                     if bit {
                         count += 1;

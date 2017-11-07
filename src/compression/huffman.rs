@@ -227,7 +227,6 @@ mod test {
         let s = b"ABADBECB";
         let encoded = h.compress(s.to_vec());
         assert!(encoded.is_ok());
-        println!("AAAAAAAAA: {:?}", encoded);
     }
 
     #[test]
