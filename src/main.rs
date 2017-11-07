@@ -199,7 +199,11 @@ fn handle_method<M: Method>(req: &mut Request) -> IronResult<Response> {
         let lock = req.get::<State<App>>().unwrap();
         let mut app = lock.write().unwrap();
 
-        m.invoke(&mut app)
+        let res = m.invoke(&mut app);
+
+        println!("app: {:?}", &*app);
+
+        res
     };
 
     let res = ok_result(answer);
@@ -207,8 +211,27 @@ fn handle_method<M: Method>(req: &mut Request) -> IronResult<Response> {
     Ok(Response::with((status::Ok, serde_json::to_string(&res).unwrap())))
 }
 
+pub mod base64 {
+    extern crate base64;
+
+    use serde::{Serializer, de, Deserialize, Deserializer};
+
+    pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        serializer.serialize_str(&base64::encode(bytes))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+        where D: Deserializer<'de>
+    {
+        let s = <&str>::deserialize(deserializer)?;
+        base64::decode(s).map_err(de::Error::custom)
+    }
+}
+
 pub mod types {
-    use std::collections::VecDeque;
+    use super::base64;
 
     pub type Username = String;
 
@@ -231,15 +254,22 @@ pub mod types {
     #[derive(Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum Update {
-        TextUpdate { from:Username, to:Username, coding:String, compression:String, text:String },
-        FileUpdate { from:Username, to:Username, coding:String, compression:String, file:FileMeta , file_id:FileId },
+        TextUpdate {
+            from: Username,
+            to: Username,
+            coding: String,
+            compression: String,
+            #[serde(with = "base64")]
+            text: Vec<u8>
+        },
+        FileUpdate { from: Username, to: Username, coding: String, compression: String, file: FileMeta, file_id: FileId },
     }
 
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum Updates {
-        Updates { updates: VecDeque<Update> }
+        Updates { updates: Vec<Update> }
     }
 
     #[derive(Clone, Debug)]
@@ -254,7 +284,7 @@ pub mod types {
     #[derive(Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum FileMeta {
-        FileMeta { name:String, size:i32, mime:String }
+        FileMeta { name: String, size: i32, mime: String }
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -316,8 +346,9 @@ pub mod methods {
         type Answer = Updates;
 
         fn invoke(self, app: &mut App) -> Updates {
-            let result = Updates::Updates { updates: app.users.get(&self.username).unwrap().inbox.clone() };
-            app.users.get_mut(&self.username).unwrap().inbox.clear();
+            let user: &mut User = app.get_or_new_user(self.username.clone());
+            let updates: Vec<Update> = user.inbox.drain(..).collect();
+            let result = Updates::Updates { updates };
             result
         }
     }
@@ -336,9 +367,9 @@ pub mod methods {
         type Answer = bool;
 
         fn invoke(self, app: &mut App) -> bool {
-            if self.to == self.from || !app.users.contains_key(&self.to) { return false };
+            if self.to == self.from || !app.users.contains_key(&self.to) { return false; };
             app.users.get_mut(&self.to).unwrap().inbox.push_back(Update::TextUpdate
-                { from: self.from, to: self.to, coding: self.coding, compression: self.compression, text: self.text });
+                { from: self.from, to: self.to, coding: self.coding, compression: self.compression, text: self.text.into_bytes() });
             true
         }
     }
@@ -374,10 +405,10 @@ pub mod methods {
         type Answer = bool;
 
         fn invoke(self, app: &mut App) -> bool {
-            if self.to == self.from || !app.users.contains_key(&self.to) { return false };
+            if self.to == self.from || !app.users.contains_key(&self.to) { return false; };
             if !app.pending.contains(&FileId::FileId { file_id: self.file_id }) ||
-                app.files.contains_key(&FileId::FileId { file_id: self.file_id }) { return false };
-            app.files.insert(FileId::FileId { file_id: self.file_id }, File { meta: self.file.clone() , content: self.bytes });
+                app.files.contains_key(&FileId::FileId { file_id: self.file_id }) { return false; };
+            app.files.insert(FileId::FileId { file_id: self.file_id }, File { meta: self.file.clone(), content: self.bytes });
             app.pending.remove(&FileId::FileId { file_id: self.file_id });
             app.users.get_mut(&self.to).unwrap().inbox.push_back(Update::FileUpdate
                 { from: self.from, to: self.to, coding: self.coding, compression: self.compression, file: self.file, file_id: FileId::FileId { file_id: self.file_id } });
@@ -395,7 +426,7 @@ pub mod methods {
         type Answer = String;
 
         fn invoke(self, app: &mut App) -> String {
-            app.files.get(&FileId::FileId { file_id: self.file_id}).unwrap().content.clone()
+            app.files.get(&FileId::FileId { file_id: self.file_id }).unwrap().content.clone()
         }
     }
 }
