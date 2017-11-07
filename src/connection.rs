@@ -1,8 +1,10 @@
 //! Network routines
 
+use serde::Serialize;
+
 use reqwest;
 
-use serde::Serialize;
+use algos::methods::Target;
 
 #[derive(Clone)]
 pub struct Connection {
@@ -24,10 +26,11 @@ impl Connection {
     fn url(&self, method: &str) -> String {
         format!("http://{}:{}/{}", self.host, self.port, method)
     }
+}
 
-    pub fn post<I: Serialize>(&self, method: &str, data: &I) -> reqwest::Result<reqwest::Response> {
-        // println!("json data: {:?}", ::serde_json::to_string(data));
-        self.client.post(&self.url(method))
+impl Target for Connection {
+    fn perform<I: Serialize>(&self, name: &str, data: &I) -> reqwest::Result<reqwest::Response> {
+        self.client.post(&self.url(name))
             .json(data)
             .send()
     }

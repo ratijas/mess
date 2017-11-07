@@ -1,19 +1,21 @@
 pub mod client;
 pub mod connection;
 
-pub mod methods;
-pub mod types;
-
 extern crate pancurses;
 extern crate reqwest;
 
 extern crate serde;
+#[allow(unused)]
 #[macro_use]
 extern crate serde_derive;
-// #[macro_use]
+#[allow(unused)]
+#[macro_use]
 extern crate serde_json;
 extern crate base64;
 
+extern crate algos;
+
+pub use algos::{types, methods};
 
 use std::io::{self, Write};
 
@@ -74,8 +76,8 @@ fn main() {
             coding: String::new(),
             compression: String::new(),
             text: msg.into_bytes(),
-        }).invoke(&gui.connection).unwrap();
-        println!("sent: {}", sent);
+        }).invoke(&gui.connection);
+        println!("sent: {:?}", sent);
     }
 }
 
