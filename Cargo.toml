@@ -4,4 +4,14 @@ version = "0.1.0"
 authors = ["ivan tkachenko <ratijas@users.noreply.github.com>"]
 
 [dependencies]
+# bits
 bit-vec = "0.4.4"
+
+# network
+reqwest = "0.8"
+
+# serde
+serde = "^1.0"
+serde_derive = "^1.0"
+serde_json = "^1.0"
+base64 = "0.7.0"
