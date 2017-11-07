@@ -25,7 +25,7 @@ impl Connection {
     }
 
     pub fn post<I: Serialize>(&self, method: &str, data: &I) -> reqwest::Result<reqwest::Response> {
-        println!("json data: {:?}", ::serde_json::to_string(data));
+        // println!("json data: {:?}", ::serde_json::to_string(data));
         self.client.post(&self.url(method))
             .json(data)
             .send()

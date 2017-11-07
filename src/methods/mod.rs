@@ -16,9 +16,11 @@ use super::connection::Connection;
 
 pub mod login;
 pub mod online;
+pub mod get_updates;
 
 pub use self::login::Login;
 pub use self::online::Online;
+pub use self::get_updates::GetUpdates;
 
 
 pub trait Method: Serialize {
@@ -29,14 +31,14 @@ pub trait Method: Serialize {
     fn invoke(&self, conn: &Connection) -> Result<Self::Answer, ()> {
         let res = conn.post(self.endpoint(), &self);
 
-        println!("response: {:?}", res);
+        // println!("response: {:?}", res);
 
         let mut value: Value = res
             .map_err(drop)?
             .json()
             .map_err(drop)?;
 
-        println!("value: {:?}", value);
+        // println!("value: {:?}", value);
 
         let obj = value.as_object_mut().ok_or(())?;
         let ok = obj.remove("ok").ok_or(())?;
@@ -44,7 +46,7 @@ pub trait Method: Serialize {
             return Err(());
         }
         let result = obj.remove("result").ok_or(())?;
-        println!("result: {:?}", result);
+        // println!("result: {:?}", result);
         ::serde_json::from_value::<Self::Answer>(result).map_err(drop)
     }
 

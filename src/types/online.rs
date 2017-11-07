@@ -1,12 +1,12 @@
 //! - `Online`
 //!     * `online users:Vector<User> = Online`
 
-use super::User;
 
+use super::Username;
 
 #[derive(Debug)]
 #[derive(Deserialize)]
 #[serde(untagged)]
 pub enum Online {
-    Online { users: Vec<String> }
+    Online { users: Vec<Username> }
 }
