@@ -2,6 +2,7 @@
 
 pub mod rle;
 pub mod huffman;
+pub mod shannon;
 
 use bit_vec::BitVec;
 
