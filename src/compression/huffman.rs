@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 use bit_vec::BitVec;
 
-use super::Compression;
+use super::{Compression, Decompression};
 
 #[derive(Clone)]
 pub struct Huffman<T> {
@@ -153,25 +153,30 @@ impl<T: Eq + Hash + Clone> Huffman<T> {
     }
 }
 
-impl<'a, T> Compression<'a, T> for Huffman<T>
+impl<'a, T, I> Compression<'a, T, I> for Huffman<T>
     where
         T: Eq + Hash + Clone + 'a,
+        I: IntoIterator<Item=&'a T>,
 {
     type Error = HuffmanError;
 
-    fn compress<I>(&self, input: I) -> Result<BitVec, Self::Error>
-        where I: IntoIterator<Item=T>
-    {
+    fn compress(&self, input: I) -> Result<BitVec, Self::Error> {
         let mut output = BitVec::new();
 
         for i in input.into_iter() {
-            match self.events.get(&i) {
+            match self.events.get(i) {
                 Some(code) => output.extend(code),
                 None => return Err(HuffmanError::UnexpectedMoreData),
             }
         }
         Ok(output)
     }
+}
+
+impl<T> Decompression<T> for Huffman<T>
+    where T: Eq + Hash + Clone
+{
+    type Error = HuffmanError;
 
     fn decompress(&self, input: BitVec) -> Result<Vec<T>, Self::Error> {
         let mut offset: usize = 0;
@@ -225,7 +230,7 @@ mod test {
         assert_eq!(&[1, 2, 3, 4, 4], &*lengths);
 
         let s = b"ABADBECB";
-        let encoded = h.compress(s.to_vec());
+        let encoded = h.compress(s);
         assert!(encoded.is_ok());
     }
 
@@ -241,7 +246,7 @@ mod test {
     fn reverse() {
         let s = "hello, world!";
         let h: Huffman<u8> = Huffman::optimal_for(s.bytes());
-        let vec = h.compress(s.bytes());
+        let vec = h.compress(s.as_bytes());
 
         assert!(vec.is_ok());
         assert_eq!(s.as_bytes(), &*h.decompress(vec.unwrap()).unwrap());

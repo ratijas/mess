@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 use bit_vec::BitVec;
 
-use super::Compression;
+use super::{Compression, Decompression};
 use super::huffman::Huffman;
 
 pub type Probability = f64;
@@ -56,19 +56,27 @@ impl<T: Eq + Hash + Clone> ShannonFano<T> {
     }
 }
 
-impl<'a, T: 'a> Compression<'a, T> for ShannonFano<T>
-    where T: Hash + Eq + Clone
+
+impl<'a, T, I> Compression<'a, T, I> for ShannonFano<T>
+    where
+        T: Eq + Hash + Clone + 'a,
+        I: IntoIterator<Item=&'a T>
+
 {
     type Error = ShannonError;
 
-    fn compress<I>(&self, input: I) -> Result<BitVec, Self::Error>
-        where I: IntoIterator<Item=T>
-    {
+    fn compress(&self, input: I) -> Result<BitVec, Self::Error> {
         self.huffman.compress(input).map_err(|_| ShannonError::UnexpectedMoreData)
     }
+}
+
+impl<T> Decompression<T> for ShannonFano<T>
+    where T: Eq + Hash + Clone
+{
+    type Error = ShannonError;
 
     fn decompress(&self, input: BitVec) -> Result<Vec<T>, Self::Error> {
-        self.huffman.decompress(input).map_err(|_| ShannonError::UnexpectedMoreData)
+        Decompression::<T>::decompress(&self.huffman, input).map_err(|_| ShannonError::UnexpectedMoreData)
     }
 }
 
@@ -138,7 +146,7 @@ mod test {
         assert_eq!(&[2, 2, 2, 3, 4, 4], &*lengths);
 
         let msg = &[1, 5, 2, 4, 3, 2, 5, 1];
-        let encoded = shannon.compress(msg.to_vec());
+        let encoded = shannon.compress(msg);
         assert!(encoded.is_ok());
     }
 
@@ -146,7 +154,7 @@ mod test {
     fn reverse() {
         let s = "hello, world!";
         let h: ShannonFano<u8> = ShannonFano::optimal_for(s.bytes());
-        let vec = h.compress(s.bytes());
+        let vec = h.compress(s.as_bytes());
 
         assert!(vec.is_ok());
         assert_eq!(s.as_bytes(), &*h.decompress(vec.unwrap()).unwrap());

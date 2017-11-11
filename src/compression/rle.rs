@@ -2,7 +2,7 @@ use std::ops::Neg;
 
 use bit_vec::BitVec;
 
-use super::Compression;
+use super::{Compression, Decompression};
 
 /// Run-length encoding (RLE).
 ///
@@ -22,11 +22,12 @@ use super::Compression;
 #[derive(Debug)]
 pub struct Rle;
 
-impl<'a> Compression<'a, u8> for Rle {
-    type Error = RleError;
+impl<'a, I> Compression<'a, u8, I> for Rle
+    where I: IntoIterator<Item=&'a u8>
+{
+    type Error = ();
 
-    fn compress<I>(&self, input: I) -> Result<BitVec, Self::Error>
-        where I: IntoIterator<Item=u8> {
+    fn compress(&self, input: I) -> Result<BitVec, Self::Error> {
         /*
         states:
         count == 0, initial
@@ -59,7 +60,7 @@ impl<'a> Compression<'a, u8> for Rle {
         let mut state = State::Initial;
         let mut out = Vec::new();  // output buffer.  working with bytes.  converting to bits at the end.
 
-        for ch in input.into_iter() {
+        for ch in input.into_iter().cloned() {
             match state {
                 State::Initial => state = State::FirstNew { new: ch },
                 State::FirstNew { new: last } => {
@@ -123,6 +124,10 @@ impl<'a> Compression<'a, u8> for Rle {
 
         Ok(BitVec::from_bytes(&*out))
     }
+}
+
+impl Decompression<u8> for Rle {
+    type Error = RleError;
 
     fn decompress(&self, input: BitVec) -> Result<Vec<u8>, RleError> {
         enum State {
@@ -181,7 +186,7 @@ mod test {
     use std::iter::once;
 
     fn test_compression(value: &[u8]) {
-        let compressed = Rle.compress(value.to_vec()).unwrap();
+        let compressed: BitVec = Rle.compress(value).unwrap();
         assert!(compressed.to_bytes().len() <= 1 + value.len());
         let decompressed = Rle.decompress(compressed);
         assert!(decompressed.is_ok());
@@ -190,16 +195,16 @@ mod test {
 
     #[test]
     fn rle_compress() {
-        assert_eq!(&*Rle.compress(b"r".to_vec()).unwrap().to_bytes(), [1u8, 'r' as u8]);
-        assert_eq!(&*Rle.compress(b"rr".to_vec()).unwrap().to_bytes(), [2u8, 'r' as u8]);
-        assert_eq!(&*Rle.compress(b"rrr".to_vec()).unwrap().to_bytes(), [3u8, 'r' as u8]);
-        assert_eq!(&*Rle.compress(b"ab".to_vec()).unwrap().to_bytes(), [-2i8 as u8, 'a' as u8, 'b' as u8]);
-        assert_eq!(&*Rle.compress(b"abb".to_vec()).unwrap().to_bytes(), [-3i8 as u8, 'a' as u8, 'b' as u8, 'b' as u8]);
-        assert_eq!(&*Rle.compress(b"abbb".to_vec()).unwrap().to_bytes(), [-1i8 as u8, 'a' as u8, 3u8, 'b' as u8]);
-        assert_eq!(&*Rle.compress(b"abbbb".to_vec()).unwrap().to_bytes(), [-1i8 as u8, 'a' as u8, 4u8, 'b' as u8]);
-        assert_eq!(&*Rle.compress(b"abc".to_vec()).unwrap().to_bytes(), [-3i8 as u8, 'a' as u8, 'b' as u8, 'c' as u8]);
-        assert_eq!(&*Rle.compress(b"abbc".to_vec()).unwrap().to_bytes(), [-4i8 as u8, 'a' as u8, 'b' as u8, 'b' as u8, 'c' as u8]);
-        assert_eq!(&*Rle.compress(b"abbcc".to_vec()).unwrap().to_bytes(), [-5i8 as u8, 'a' as u8, 'b' as u8, 'b' as u8, 'c' as u8, 'c' as u8]);
+        assert_eq!(&*Rle.compress(b"r").unwrap().to_bytes(), [1u8, 'r' as u8]);
+        assert_eq!(&*Rle.compress(b"rr").unwrap().to_bytes(), [2u8, 'r' as u8]);
+        assert_eq!(&*Rle.compress(b"rrr").unwrap().to_bytes(), [3u8, 'r' as u8]);
+        assert_eq!(&*Rle.compress(b"ab").unwrap().to_bytes(), [-2i8 as u8, 'a' as u8, 'b' as u8]);
+        assert_eq!(&*Rle.compress(b"abb").unwrap().to_bytes(), [-3i8 as u8, 'a' as u8, 'b' as u8, 'b' as u8]);
+        assert_eq!(&*Rle.compress(b"abbb").unwrap().to_bytes(), [-1i8 as u8, 'a' as u8, 3u8, 'b' as u8]);
+        assert_eq!(&*Rle.compress(b"abbbb").unwrap().to_bytes(), [-1i8 as u8, 'a' as u8, 4u8, 'b' as u8]);
+        assert_eq!(&*Rle.compress(b"abc").unwrap().to_bytes(), [-3i8 as u8, 'a' as u8, 'b' as u8, 'c' as u8]);
+        assert_eq!(&*Rle.compress(b"abbc").unwrap().to_bytes(), [-4i8 as u8, 'a' as u8, 'b' as u8, 'b' as u8, 'c' as u8]);
+        assert_eq!(&*Rle.compress(b"abbcc").unwrap().to_bytes(), [-5i8 as u8, 'a' as u8, 'b' as u8, 'b' as u8, 'c' as u8, 'c' as u8]);
 
         //              h                 e                 l        l        o
         //          01101000          01100101          01101100 01101100 01101111
@@ -213,17 +218,17 @@ mod test {
 
     #[test]
     fn edge_cases() {
-        assert_eq!(&*Rle.compress("a".repeat(::std::i8::MAX as usize).bytes()).unwrap().to_bytes(),
+        assert_eq!(&*Rle.compress("a".repeat(::std::i8::MAX as usize).as_bytes()).unwrap().to_bytes(),
                    [::std::i8::MAX as u8, 'a' as u8]);
 
-        assert_eq!(&*Rle.compress("a".repeat(1 + ::std::i8::MAX as usize).bytes()).unwrap().to_bytes(),
+        assert_eq!(&*Rle.compress("a".repeat(1 + ::std::i8::MAX as usize).as_bytes()).unwrap().to_bytes(),
                    [::std::i8::MAX as u8, 'a' as u8, 1u8, 'a' as u8]);
 
         let min = (-(::std::i8::MIN as isize)) as usize;
         let seq: Vec<u8> = (0..min).map(|i| i as u8).collect();
 
-        let expected: Vec<_> = once(min as u8).chain(seq.clone()).collect();
-        assert_eq!(&*Rle.compress(seq.into_iter()).unwrap().to_bytes(),
+        let expected: Vec<u8> = once(min as u8).chain(seq.clone()).collect();
+        assert_eq!(&*Rle.compress(&seq).unwrap().to_bytes(),
                    &*expected);
 
         let seq: Vec<u8> = (0..min + 1).map(|i| i as u8).collect();
@@ -233,10 +238,10 @@ mod test {
             .chain(once(1u8))
             .chain(once(min as u8))
             .collect();
-        assert_eq!(&*Rle.compress(seq.into_iter()).unwrap().to_bytes(),
+        assert_eq!(&*Rle.compress(&seq).unwrap().to_bytes(),
                    &*expected);
 
-        assert_eq!(Rle.compress(b"".to_vec()).unwrap().to_bytes(), &[0u8; 0]);
+        assert_eq!(Rle.compress(b"").unwrap().to_bytes(), &[0u8; 0]);
     }
 
     #[test]
