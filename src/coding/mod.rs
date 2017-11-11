@@ -1,7 +1,7 @@
 pub mod parity;
 pub mod repetition3;
 pub mod repetition5;
-// pub mod hamming;
+pub mod hamming;
 
 use bit_vec::BitVec;
 
