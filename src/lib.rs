@@ -1,5 +1,6 @@
 // bits
 extern crate bit_vec;
+extern crate rand;
 
 // network
 extern crate reqwest;
@@ -23,3 +24,5 @@ pub use compression::Compression;
 
 pub mod types;
 pub mod methods;
+
+pub mod noise;
