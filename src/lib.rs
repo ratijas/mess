@@ -1,6 +1,7 @@
 // bits
 extern crate bit_vec;
 extern crate rand;
+extern crate void;
 
 // network
 extern crate reqwest;

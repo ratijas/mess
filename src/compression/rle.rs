@@ -1,6 +1,7 @@
 use std::ops::Neg;
 
 use bit_vec::BitVec;
+use void::Void;
 
 use super::{Compression, Decompression};
 
@@ -25,7 +26,7 @@ pub struct Rle;
 impl<'a, I> Compression<'a, u8, I> for Rle
     where I: IntoIterator<Item=&'a u8>
 {
-    type Error = ();
+    type Error = Void;
 
     fn compress(&self, input: I) -> Result<BitVec, Self::Error> {
         /*

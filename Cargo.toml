@@ -7,6 +7,7 @@ authors = ["ivan tkachenko <ratijas@users.noreply.github.com>"]
 # bits
 bit-vec = "0.4.4"
 rand = "0.3"
+void = "1"
 
 # network
 reqwest = "0.8"
