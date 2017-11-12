@@ -30,6 +30,14 @@ impl NoiseLevel {
             NoiseLevel::Noise100 => 1.00,
         }
     }
+    pub fn to_str(self) -> &'static str {
+        match self {
+            NoiseLevel::Noise001 => "0.01",
+            NoiseLevel::Noise005 => "0.05",
+            NoiseLevel::Noise015 => "0.15",
+            NoiseLevel::Noise100 => "1.00",
+        }
+    }
 }
 
 pub struct NoiseIter<I> {
