@@ -14,9 +14,13 @@ use bit_vec::BitVec;
 /// Type `T` is the type of elements in the stream to be compressed / decompressed.
 /// Probably, byte type `u8` is the most useful here.
 pub trait Compression<T> {
-    type Error;
+    fn compress(&self, input: &[T]) -> Result<BitVec, Error>;
 
-    fn compress(&self, input: &[T]) -> Result<BitVec, Self::Error>;
+    fn decompress(&self, input: BitVec) -> Result<Vec<T>, Error>;
+}
 
-    fn decompress(&self, input: BitVec) -> Result<Vec<T>, Self::Error>;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Error {
+    ExpectedMoreData,
+    ZeroRepetition,
 }

@@ -3,18 +3,13 @@ use std::hash::Hash;
 
 use bit_vec::BitVec;
 
-use super::Compression;
+use super::{Compression, Error};
 
 #[derive(Clone)]
 pub struct Huffman<T> {
     pub events: HashMap<T, BitVec>,
     /// reverse map
     pub codes: HashMap<BitVec, T>,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum HuffmanError {
-    UnexpectedMoreData,
 }
 
 pub type Probability = f64;
@@ -152,21 +147,19 @@ impl<T: Eq + Hash + Clone> Huffman<T> {
 impl<T> Compression<T> for Huffman<T>
     where T: Eq + Hash + Clone
 {
-    type Error = HuffmanError;
-
-    fn compress(&self, input: &[T]) -> Result<BitVec, Self::Error> {
+    fn compress(&self, input: &[T]) -> Result<BitVec, Error> {
         let mut output = BitVec::new();
 
         for i in input {
             match self.events.get(i) {
                 Some(code) => output.extend(code),
-                None => return Err(HuffmanError::UnexpectedMoreData),
+                None => return Err(Error::ExpectedMoreData),
             }
         }
         Ok(output)
     }
 
-    fn decompress(&self, input: BitVec) -> Result<Vec<T>, Self::Error> {
+    fn decompress(&self, input: BitVec) -> Result<Vec<T>, Error> {
         let mut offset: usize = 0;
         let mut output: Vec<T> = Vec::new();
 
@@ -175,7 +168,7 @@ impl<T> Compression<T> for Huffman<T>
 
             while let None = self.codes.get(&slice) {
                 match input.get(offset) {
-                    None => return Err(HuffmanError::UnexpectedMoreData),
+                    None => return Err(Error::ExpectedMoreData),
                     Some(bit) => {
                         slice.push(bit);
                         offset += 1;

@@ -2,7 +2,7 @@ use std::ops::Neg;
 
 use bit_vec::BitVec;
 
-use super::Compression;
+use super::{Compression, Error};
 
 /// Run-length encoding (RLE).
 ///
@@ -23,9 +23,7 @@ use super::Compression;
 pub struct Rle;
 
 impl Compression<u8> for Rle {
-    type Error = RleError;
-
-    fn compress(&self, input: &[u8]) -> Result<BitVec, Self::Error> {
+    fn compress(&self, input: &[u8]) -> Result<BitVec, Error> {
         /*
         states:
         count == 0, initial
@@ -127,7 +125,7 @@ impl Compression<u8> for Rle {
         Ok(BitVec::from_bytes(&*out))
     }
 
-    fn decompress(&self, input: BitVec) -> Result<Vec<u8>, RleError> {
+    fn decompress(&self, input: BitVec) -> Result<Vec<u8>, Error> {
         enum State {
             Initial,
             /// always `count > 0`.
@@ -145,7 +143,7 @@ impl Compression<u8> for Rle {
                     match ch as i8 {
                         count if count > 0 => state = State::Same { count },
                         count if count < 0 => state = State::Different { count },
-                        0 | _ => return Err(RleError::ZeroRepetition),
+                        0 | _ => return Err(Error::ZeroRepetition),
                     }
                 }
                 State::Same { count } => {
@@ -167,15 +165,9 @@ impl Compression<u8> for Rle {
 
         match state {
             State::Initial => Ok(out),
-            _ => Err(RleError::ExpectedMoreData),
+            _ => Err(Error::ExpectedMoreData),
         }
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum RleError {
-    ExpectedMoreData,
-    ZeroRepetition
 }
 
 #[cfg(test)]
@@ -253,8 +245,8 @@ mod test {
     #[test]
     fn rle_decompress_errors() {
         // 0xfb is -5
-        assert_eq!(Rle.decompress(BitVec::from_bytes(b"\xfbabcd")), Err(RleError::ExpectedMoreData));
-        assert_eq!(Rle.decompress(BitVec::from_bytes(b"\x04 \x02.\x07")), Err(RleError::ExpectedMoreData));
-        assert_eq!(Rle.decompress(BitVec::from_bytes(b"\x04 \x00.\x04 ")), Err(RleError::ZeroRepetition));
+        assert_eq!(Rle.decompress(BitVec::from_bytes(b"\xfbabcd")), Err(Error::ExpectedMoreData));
+        assert_eq!(Rle.decompress(BitVec::from_bytes(b"\x04 \x02.\x07")), Err(Error::ExpectedMoreData));
+        assert_eq!(Rle.decompress(BitVec::from_bytes(b"\x04 \x00.\x04 ")), Err(Error::ZeroRepetition));
     }
 }
