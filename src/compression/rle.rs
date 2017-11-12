@@ -52,7 +52,9 @@ impl Compression<u8> for Rle {
             /// always `count >= 2`.
             ManySame { last: u8, count: i8 },
             /// `buffer` always contains at least 2 bytes.
-            /// `count` indicates how many times the last byte in `buffer` has been repeated, always between 0 and 2 inclusive.
+            /// `count` indicates how many times the last byte in `buffer` has been repeated,
+            /// always either 0 or 1, where 0 means there are unique characters at the tail,
+            /// and 1 means there is a double.
             ManyDifferent { buffer: Vec<u8>, count: i8 },
         }
 
@@ -87,26 +89,28 @@ impl Compression<u8> for Rle {
                     }
                 }
                 State::ManyDifferent { mut buffer, count } => {
-                    let last = *buffer.last().unwrap();
-                    if last == ch {
-                        // don't hurry up flushing the buffer.  maybe it just 2 bytes repeated in the middle of random data.
-                        if count == 1 {
-                            flush_buffer(&mut out, &buffer[..buffer.len() - 2]);
-                            state = State::ManySame { last, count: 3 };
-                        } else {
-                            buffer.push(ch);
-                            state = State::ManyDifferent { buffer, count: count + 1 }
+                    match buffer.len() {
+                        len if len > (-(::std::i8::MIN as isize)) as usize => unreachable!(),
+                        len if len == (-(::std::i8::MIN as isize)) as usize => {
+                            flush_buffer(&mut out, &buffer);
+                            state = State::FirstNew { new: ch };
                         }
-                    } else {
-                        match buffer.len() {
-                            len if len > (-(::std::i8::MIN as isize)) as usize => unreachable!(),
-                            len if len == (-(::std::i8::MIN as isize)) as usize => {
-                                flush_buffer(&mut out, &buffer);
-                                state = State::FirstNew { new: ch };
-                            }
-                            _ => {
+                        _ => {
+                            let last = *buffer.last().unwrap();
+                            if last != ch {
                                 buffer.push(ch);
                                 state = State::ManyDifferent { buffer, count: 0 }
+                            } else {
+                                // don't hurry up flushing the buffer.  maybe it just 2 bytes repeated in the middle of random data.
+                                if count == 0 {
+                                    buffer.push(ch);
+                                    state = State::ManyDifferent { buffer, count: 1 }
+                                } else if count == 1 {
+                                    flush_buffer(&mut out, &buffer[..buffer.len() - 2]);
+                                    state = State::ManySame { last, count: 3 };
+                                } else {
+                                    unreachable!();
+                                }
                             }
                         }
                     }
