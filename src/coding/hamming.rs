@@ -52,7 +52,6 @@ impl Coding for Hamming {
                 diff -= 1;
                 let get = input.get(diff + i * 7).unwrap();
                 input.set(diff + 7 * i, !get);
-                println!("{:?} {:?}", diff, i);
                 stats.detected += 1;
                 stats.corrected += 1;
             }
