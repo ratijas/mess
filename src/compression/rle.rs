@@ -1,9 +1,8 @@
 use std::ops::Neg;
 
 use bit_vec::BitVec;
-use void::Void;
 
-use super::{Compression, Decompression};
+use super::Compression;
 
 /// Run-length encoding (RLE).
 ///
@@ -24,7 +23,7 @@ use super::{Compression, Decompression};
 pub struct Rle;
 
 impl Compression<u8> for Rle {
-    type Error = Void;
+    type Error = RleError;
 
     fn compress(&self, input: &[u8]) -> Result<BitVec, Self::Error> {
         /*
@@ -127,10 +126,6 @@ impl Compression<u8> for Rle {
 
         Ok(BitVec::from_bytes(&*out))
     }
-}
-
-impl Decompression<u8> for Rle {
-    type Error = RleError;
 
     fn decompress(&self, input: BitVec) -> Result<Vec<u8>, RleError> {
         enum State {

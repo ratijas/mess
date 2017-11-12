@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 use bit_vec::BitVec;
 
-use super::{Compression, Decompression};
+use super::Compression;
 use super::huffman::Huffman;
 
 pub type Probability = f64;
@@ -61,15 +61,9 @@ impl<T> Compression<T> for ShannonFano<T>
     fn compress(&self, input: &[T]) -> Result<BitVec, Self::Error> {
         self.huffman.compress(input).map_err(|_| ShannonError::UnexpectedMoreData)
     }
-}
-
-impl<T> Decompression<T> for ShannonFano<T>
-    where T: Eq + Hash + Clone
-{
-    type Error = ShannonError;
 
     fn decompress(&self, input: BitVec) -> Result<Vec<T>, Self::Error> {
-        Decompression::<T>::decompress(&self.huffman, input).map_err(|_| ShannonError::UnexpectedMoreData)
+        self.huffman.decompress(input).map_err(|_| ShannonError::UnexpectedMoreData)
     }
 }
 

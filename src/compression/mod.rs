@@ -17,10 +17,6 @@ pub trait Compression<T> {
     type Error;
 
     fn compress(&self, input: &[T]) -> Result<BitVec, Self::Error>;
-}
-
-pub trait Decompression<T> {
-    type Error;
 
     fn decompress(&self, input: BitVec) -> Result<Vec<T>, Self::Error>;
 }

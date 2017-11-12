@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 use bit_vec::BitVec;
 
-use super::{Compression, Decompression};
+use super::Compression;
 
 #[derive(Clone)]
 pub struct Huffman<T> {
@@ -165,12 +165,6 @@ impl<T> Compression<T> for Huffman<T>
         }
         Ok(output)
     }
-}
-
-impl<T> Decompression<T> for Huffman<T>
-    where T: Eq + Hash + Clone
-{
-    type Error = HuffmanError;
 
     fn decompress(&self, input: BitVec) -> Result<Vec<T>, Self::Error> {
         let mut offset: usize = 0;
