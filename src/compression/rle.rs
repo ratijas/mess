@@ -23,12 +23,10 @@ use super::{Compression, Decompression};
 #[derive(Debug)]
 pub struct Rle;
 
-impl<'a, I> Compression<'a, u8, I> for Rle
-    where I: IntoIterator<Item=&'a u8>
-{
+impl Compression<u8> for Rle {
     type Error = Void;
 
-    fn compress(&self, input: I) -> Result<BitVec, Self::Error> {
+    fn compress(&self, input: &[u8]) -> Result<BitVec, Self::Error> {
         /*
         states:
         count == 0, initial

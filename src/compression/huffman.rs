@@ -46,15 +46,11 @@ impl<T: Eq + Hash + Clone> Huffman<T> {
         Huffman::new(map)
     }
 
-    pub fn optimal_for<'a, I>(input: I) -> Self
-        where
-            T: 'a,
-            I: Iterator<Item=T> + 'a,
-    {
+    pub fn optimal_for(input: &[T]) -> Self {
         let mut frequency: HashMap<T, usize> = HashMap::new();
 
         let mut total: usize = 0;
-        for i in input {
+        for i in input.iter() {
             let ent = frequency.entry(i.clone()).or_insert(0usize);
             *ent += 1;
             total += 1;
@@ -153,17 +149,15 @@ impl<T: Eq + Hash + Clone> Huffman<T> {
     }
 }
 
-impl<'a, T, I> Compression<'a, T, I> for Huffman<T>
-    where
-        T: Eq + Hash + Clone + 'a,
-        I: IntoIterator<Item=&'a T>,
+impl<T> Compression<T> for Huffman<T>
+    where T: Eq + Hash + Clone
 {
     type Error = HuffmanError;
 
-    fn compress(&self, input: I) -> Result<BitVec, Self::Error> {
+    fn compress(&self, input: &[T]) -> Result<BitVec, Self::Error> {
         let mut output = BitVec::new();
 
-        for i in input.into_iter() {
+        for i in input {
             match self.events.get(i) {
                 Some(code) => output.extend(code),
                 None => return Err(HuffmanError::UnexpectedMoreData),
@@ -236,16 +230,16 @@ mod test {
 
     #[test]
     fn optimal() {
-        let h: Huffman<char> = Huffman::optimal_for("01110-1111".chars());
-        assert_eq!(1, h.events.get(&'1').unwrap().len());
-        assert_eq!(2, h.events.get(&'0').unwrap().len());
-        assert_eq!(2, h.events.get(&'-').unwrap().len());
+        let h: Huffman<u8> = Huffman::optimal_for(b"01110-1111");
+        assert_eq!(1, h.events.get(&('1' as u8)).unwrap().len());
+        assert_eq!(2, h.events.get(&('0' as u8)).unwrap().len());
+        assert_eq!(2, h.events.get(&('-' as u8)).unwrap().len());
     }
 
     #[test]
     fn reverse() {
         let s = "hello, world!";
-        let h: Huffman<u8> = Huffman::optimal_for(s.bytes());
+        let h: Huffman<u8> = Huffman::optimal_for(s.as_bytes());
         let vec = h.compress(s.as_bytes());
 
         assert!(vec.is_ok());

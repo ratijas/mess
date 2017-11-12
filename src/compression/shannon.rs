@@ -17,10 +17,10 @@ pub enum ShannonError {
     UnexpectedMoreData,
 }
 
-impl<T: Eq + Hash + Clone> ShannonFano<T> {
-    pub fn with_probabilities(events: HashMap<T, Probability>) -> ShannonFano<T>
-        where T: Hash + Eq
-    {
+impl<T> ShannonFano<T>
+    where T: Eq + Hash + Clone
+{
+    pub fn with_probabilities(events: HashMap<T, Probability>) -> ShannonFano<T> {
         let mut output = HashMap::new();
         let mut pairs = events.into_iter().collect::<Vec<(T, Probability)>>();
         pairs.sort_by(|&(_, p1), &(_, p2)| p1.partial_cmp(&p2).unwrap());
@@ -31,11 +31,7 @@ impl<T: Eq + Hash + Clone> ShannonFano<T> {
         }
     }
 
-    pub fn optimal_for<'a, I>(input: I) -> Self
-        where
-            T: 'a,
-            I: Iterator<Item=T> + 'a,
-    {
+    pub fn optimal_for(input: &[T]) -> Self {
         let mut frequency: HashMap<T, usize> = HashMap::new();
 
         let mut total: usize = 0;
@@ -57,15 +53,12 @@ impl<T: Eq + Hash + Clone> ShannonFano<T> {
 }
 
 
-impl<'a, T, I> Compression<'a, T, I> for ShannonFano<T>
-    where
-        T: Eq + Hash + Clone + 'a,
-        I: IntoIterator<Item=&'a T>
-
+impl<T> Compression<T> for ShannonFano<T>
+    where T: Eq + Hash + Clone
 {
     type Error = ShannonError;
 
-    fn compress(&self, input: I) -> Result<BitVec, Self::Error> {
+    fn compress(&self, input: &[T]) -> Result<BitVec, Self::Error> {
         self.huffman.compress(input).map_err(|_| ShannonError::UnexpectedMoreData)
     }
 }
@@ -153,7 +146,7 @@ mod test {
     #[test]
     fn reverse() {
         let s = "hello, world!";
-        let h: ShannonFano<u8> = ShannonFano::optimal_for(s.bytes());
+        let h: ShannonFano<u8> = ShannonFano::optimal_for(s.as_bytes());
         let vec = h.compress(s.as_bytes());
 
         assert!(vec.is_ok());
