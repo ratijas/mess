@@ -1,7 +1,6 @@
 use std::io::{self, Read};
 use std::fs;
 use std::result;
-use std::path::{Path, PathBuf};
 
 use rusqlite::*;
 
@@ -12,7 +11,7 @@ const PATH: &str = "./stats.db";
 const SCHEMA: &str = "./data/schema.sql";
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct File {
     pub file_name: String,
     pub file_type: Mime,
@@ -30,6 +29,7 @@ pub struct Compression {
 #[derive(Debug)]
 pub struct Coding {
     pub file_name: String,
+    pub compression: String,
     pub coding_name: String,
     pub noise_rate: String,
     pub redundancy_rate: f64,
@@ -65,6 +65,8 @@ impl File {
             file_size: entry.metadata()?.len() as i32,
         })
     }
+
+    #[allow(unused)]
     pub fn load<I: AsRef<str>>(file_name: I) -> Result<File> {
         let conn = connection()?;
         let sql = "\
@@ -98,8 +100,31 @@ impl File {
     }
 }
 
+impl Compression {
+    pub fn save(&self) -> Result<()> {
+        let conn = connection()?;
+        let sql = "
+        INSERT OR REPLACE INTO compression (file_name,
+                                            compression,
+                                            compress_rate,
+                                            size_compressed)
+                        VALUES (?1, ?2, ?3, ?4)
+        ";
+        let mut stmt = conn.prepare_cached(sql)?;
+        stmt.execute(&[
+            &self.file_name,
+            &self.compression,
+            &self.compress_rate,
+            &self.size_compressed,
+        ])?;
+        Ok(())
+    }
+}
+
 impl Coding {
+    #[allow(unused)]
     pub fn load(file_name: &str,
+                compression: &str,
                 coding_name: &str,
                 noise_rate: &str) -> Result<Coding>
     {
@@ -117,6 +142,7 @@ impl Coding {
             |row| {
                 Coding {
                     file_name: file_name.into(),
+                    compression: compression.into(),
                     coding_name: coding_name.into(),
                     noise_rate: noise_rate.into(),
                     redundancy_rate: row.get(0),
@@ -133,6 +159,7 @@ impl Coding {
         let conn = connection()?;
         let sql = "
         INSERT OR REPLACE INTO coding (file_name,
+                                       compression,
                                        coding_name,
                                        noise_rate,
                                        redundancy_rate,
@@ -141,11 +168,12 @@ impl Coding {
                                        corrected,
                                        detected,
                                        not_corrected)
-                        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         ";
         let mut stmt = conn.prepare_cached(sql)?;
         stmt.execute(&[
             &self.file_name,
+            &self.compression,
             &self.coding_name,
             &self.noise_rate,
             &self.redundancy_rate,
