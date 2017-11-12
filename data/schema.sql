@@ -1,0 +1,35 @@
+BEGIN TRANSACTION;
+
+DROP TABLE IF EXISTS `file`;
+CREATE TABLE `file` (
+  `file_name` TEXT    NOT NULL PRIMARY KEY,
+  `file_type` TEXT    NOT NULL,
+  `file_size` INTEGER NOT NULL
+);
+
+DROP TABLE IF EXISTS `compression`;
+CREATE TABLE `compression` (
+  `file_name`       TEXT    NOT NULL,
+  `compression`     TEXT    NOT NULL CHECK (`compression` IN ('huffman', 'rle', 'shannon')),
+  `compress_rate`   REAL    NOT NULL,
+  `size_compressed` INTEGER NOT NULL,
+  PRIMARY KEY (`file_name`, `compression`),
+  FOREIGN KEY (`file_name`) REFERENCES `file` (`file_name`)
+);
+
+DROP TABLE IF EXISTS `coding`;
+CREATE TABLE `coding` (
+  `file_name`       TEXT    NOT NULL REFERENCES `file`,
+  `coding_name`     TEXT    NOT NULL CHECK (`coding_name` IN ('hamming', 'parity', 'r3', 'r5')),
+  `noise_rate`      TEXT    NOT NULL CHECK (`noise_rate` IN ('0.01', '0.05', '0.15')),
+  `redundancy_rate` REAL    NOT NULL,
+  `size_decoded`    INTEGER NOT NULL,
+  `size_encoded`    INTEGER NOT NULL,
+  `corrected`       INTEGER NOT NULL,
+  `detected`        INTEGER NOT NULL CHECK (`detected` <= `corrected`),
+  `not_corrected`   INTEGER NOT NULL,
+  PRIMARY KEY (`file_name`, `coding_name`, `noise_rate`),
+  FOREIGN KEY (`file_name`) REFERENCES `file` (`file_name`)
+);
+
+COMMIT;
