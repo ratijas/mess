@@ -1,5 +1,7 @@
 BEGIN TRANSACTION;
 
+/* all sizes are in bits */
+
 DROP TABLE IF EXISTS `file`;
 CREATE TABLE `file` (
   `file_name` TEXT    NOT NULL PRIMARY KEY,
@@ -24,11 +26,11 @@ CREATE TABLE `coding` (
   `coding_name`     TEXT    NOT NULL CHECK (`coding_name` IN ('hamming', 'parity', 'r3', 'r5')),
   `noise_rate`      TEXT    NOT NULL CHECK (`noise_rate` IN ('0.01', '0.05', '0.15')),
   `redundancy_rate` REAL    NOT NULL,
-  `size_decoded`    INTEGER NOT NULL,
+  `size_decoded`    INTEGER NOT NULL, /* bazicali, duplicate of `compression`.`size_compressed` */
   `size_encoded`    INTEGER NOT NULL,
   `corrected`       INTEGER NOT NULL,
   `detected`        INTEGER NOT NULL CHECK (`corrected` <= `detected`),
-  `not_corrected`   INTEGER NOT NULL,
+  `not_corrected`   INTEGER NOT NULL CHECK (`not_corrected` <= `size_decoded`),
   PRIMARY KEY (`file_name`, `compression`, `coding_name`, `noise_rate`),
   FOREIGN KEY (`file_name`) REFERENCES `file` (`file_name`),
   FOREIGN KEY (`file_name`, `compression`) REFERENCES `compression` (`file_name`, `compression`)

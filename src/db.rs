@@ -15,7 +15,7 @@ const SCHEMA: &str = "./data/schema.sql";
 pub struct File {
     pub file_name: String,
     pub file_type: Mime,
-    pub file_size: i32,
+    pub file_size: i64,
 }
 
 #[derive(Debug)]
@@ -23,7 +23,7 @@ pub struct Compression {
     pub file_name: String,
     pub compression: String,
     pub compress_rate: f64,
-    pub size_compressed: i32,
+    pub size_compressed: i64,
 }
 
 #[derive(Debug)]
@@ -33,11 +33,11 @@ pub struct Coding {
     pub coding_name: String,
     pub noise_rate: String,
     pub redundancy_rate: f64,
-    pub size_decoded: i32,
-    pub size_encoded: i32,
-    pub corrected: i32,
-    pub detected: i32,
-    pub not_corrected: i32,
+    pub size_decoded: i64,
+    pub size_encoded: i64,
+    pub corrected: i64,
+    pub detected: i64,
+    pub not_corrected: i64,
 }
 
 fn connection() -> Result<Connection> {
@@ -62,7 +62,7 @@ impl File {
         Ok(File {
             file_name: entry.path().into_os_string().into_string().map_err(|_| io::Error::from(io::ErrorKind::Other))?,
             file_type: mime_guess::guess_mime_type(entry.path()),
-            file_size: entry.metadata()?.len() as i32,
+            file_size: 8 * entry.metadata()?.len() as i64,
         })
     }
 
