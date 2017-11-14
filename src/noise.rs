@@ -17,7 +17,7 @@ impl NoiseLevel {
     pub fn apply<I: Iterator>(self, iter: I) -> NoiseIter<I> {
         NoiseIter::<I> {
             it: iter,
-            level: self,
+            level: self.to_f64(),
             rng: rand::thread_rng(),
         }
     }
@@ -42,7 +42,7 @@ impl NoiseLevel {
 
 pub struct NoiseIter<I> {
     it: I,
-    level: NoiseLevel,
+    level: f64,
     rng: rand::ThreadRng,
 }
 
@@ -54,7 +54,7 @@ impl<I: Iterator> Iterator for NoiseIter<I>
 
     fn next(&mut self) -> Option<Self::Item> {
         self.it.next().map(|i| {
-            if self.rng.next_f64() < self.level.to_f64() {
+            if self.rng.next_f64() < self.level {
                 !i
             } else {
                 i
