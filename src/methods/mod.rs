@@ -1,10 +1,11 @@
+//! server methods:
 //! - `login username:string = LoginResult`
 //! - `online = Online`
 //! - `getUpdates username:string = Updates`
-//! - `sendText from:Username to:Username coding:string compression:string text:string = Bool`
-//! - `sendFile from:Username to:Username coding:string compression:string file:FileMeta = FileId`
-//! - `uploadFile file_id:FileId bytes:bytes = Bool`
-//! - `downloadFile file_id:FileId = bytes`
+//! - `sendFile = FileId`
+//! - `sendText from:Username to:Username payload:Data = Bool`
+//! - `uploadFile from:Username to:Username file:FileMeta file_id:FileId payload:Data = Bool`
+//! - `downloadFile file_id:FileId = Data`
 
 use std::str;
 use std::io::{self, Read};
@@ -15,18 +16,25 @@ use serde_json;
 
 use reqwest;
 
+pub use super::types::base64;
+pub use super::types::Username;
+
 pub mod login;
 pub mod online;
 pub mod get_updates;
+pub mod send_file;
 pub mod send_text;
+pub mod upload_file;
+pub mod download_file;
 
 pub use self::login::Login;
 pub use self::online::Online;
 pub use self::get_updates::GetUpdates;
+pub use self::send_file::SendFile;
 pub use self::send_text::SendText;
+pub use self::upload_file::UploadFile;
+pub use self::download_file::DownloadFile;
 
-pub use super::types::base64;
-pub use super::types::Username;
 
 pub trait Method: Serialize + DeserializeOwned {
     type Answer: Serialize + DeserializeOwned + ::std::fmt::Debug;
@@ -34,11 +42,13 @@ pub trait Method: Serialize + DeserializeOwned {
     fn endpoint(&self) -> &'static str;
 }
 
+
 /// Client side trait to invoke RPC method
 pub trait ClientMethod: Method {
     fn invoke<T: Target>(&self, target: &T) -> Result<Self::Answer, ClientError>;
     fn invoke_raw<T: Target>(&self, target: &T) -> reqwest::Result<reqwest::Response>;
 }
+
 
 pub enum ClientError {
     ReqwestError(reqwest::Error),
@@ -48,9 +58,11 @@ pub enum ClientError {
     ServerError(Option<String>),
 }
 
+
 pub trait Target {
     fn perform<I: Serialize>(&self, name: &str, data: &I) -> reqwest::Result<reqwest::Response>;
 }
+
 
 /// Server side method to handle RPC method
 ///
@@ -59,6 +71,7 @@ pub trait ServerMethod<Ctx>: Method {
     fn handle(self, context: &mut Ctx) -> Self::Answer;
 }
 
+
 #[derive(Debug)]
 #[derive(Deserialize)]
 struct GeneralAnswer<T: ::std::fmt::Debug> {
@@ -66,6 +79,7 @@ struct GeneralAnswer<T: ::std::fmt::Debug> {
     result: Option<T>,
     description: Option<String>,
 }
+
 
 impl<M> ClientMethod for M
     where M: Method

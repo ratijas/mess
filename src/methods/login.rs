@@ -1,8 +1,7 @@
 //! - `login username:string = LoginResult`
 
 use super::Method;
-use ::types::LoginResult;
-
+use ::types;
 
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
@@ -11,7 +10,7 @@ pub struct Login {
 }
 
 impl Method for Login {
-    type Answer = LoginResult;
+    type Answer = types::LoginResult;
 
     fn endpoint(&self) -> &'static str {
         "login"

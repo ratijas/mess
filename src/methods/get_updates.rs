@@ -1,8 +1,7 @@
 //! - `getUpdates username:string = Updates`
 
 use super::Method;
-use ::types::Updates;
-
+use ::types;
 
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
@@ -11,7 +10,7 @@ pub struct GetUpdates {
 }
 
 impl Method for GetUpdates {
-    type Answer = Updates;
+    type Answer = types::Updates;
 
     fn endpoint(&self) -> &'static str {
         "getUpdates"
