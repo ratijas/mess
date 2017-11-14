@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["ivan tkachenko <ratijas@users.noreply.github.com>"]
 
 [dependencies]
+lazy_static = "0.2"
 bit-vec = "0.4.4"
 
 rusqlite = "0.12.0"

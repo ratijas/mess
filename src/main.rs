@@ -3,6 +3,8 @@ use std::fs::{self};
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+#[macro_use]
+extern crate lazy_static;
 extern crate bit_vec;
 extern crate rusqlite;
 extern crate mime;
@@ -46,12 +48,12 @@ fn run() -> Result<()> {
     let n_workers = num_cpus::get();
     let pool = ThreadPool::new(n_workers);
 
-    for entry in files(&data_dir)?.into_iter().filter(|f| f.path().as_os_str().to_str().unwrap() == "./data/files/Information Theory Project 2 Datasets /WAV/04_The_Devil_In_I.wav") {
+    for entry in files(&data_dir)? {
         let db_file = db::File::for_dir_entry(&entry).map_err(|_| "io error")?;
         db_file.save().map_err(|_| "sqlite")?;
 
         let path = entry.path();
-        println!("path: {}", path.to_str().ok_or("path")?);
+        // println!("path: {}", path.to_str().ok_or("path")?);
 
         let mut file = fs::File::open(path).map_err(|_| "open file")?;
         let mut content: Vec<u8> = Vec::new();
@@ -158,7 +160,7 @@ pub fn live_with_it(compression_name: &str,
         (&Parity, "parity"),
         (&Hamming, "hamming")
     ].iter() {
-        println!("    coding: {}", coding_name);
+        // println!("    coding: {}", coding_name);
 
         let encoded = coding.encode(compressed.clone());
         // println!("    encoded: {:?}", &encoded);
@@ -197,23 +199,27 @@ pub fn live_with_it(compression_name: &str,
             };
             coding.save().map_err(|_| "save coding")?;
 
-            let decompressed = Rle.decompress(decoded);
+            let _decompressed = Rle.decompress(decoded);
+            /*
             match decompressed {
                 Ok(ref vec) => {
                     // let decompressed = BitVec::from_bytes(&vec);
                     // // println!("decompressed {:?}", &decompressed);
 
-                    let error = distance_vec(&original, &vec);
-                    println!(" undetected: {}", error);
+                    // let error = distance_vec(&original, &vec);
+                    // println!(" undetected: {}", error);
 
                     // println!("result:");
                     // std::io::stdout().write(&vec).unwrap();
-                    // std::io::stdout().write(b"\n\n").unwrap();
-                    // std::io::stdout().flush().unwrap();
                 }
                 Err(ref e) => println!("decompress error: {:?}", e),
             }
+            */
+            std::io::stdout().write(b".").unwrap();
+            std::io::stdout().flush().unwrap();
         }
     }
+    std::io::stdout().write(b"\n").unwrap();
+    std::io::stdout().flush().unwrap();
     Ok(())
 }
