@@ -1,3 +1,7 @@
+// log
+#[macro_use]
+extern crate log;
+
 // bits
 extern crate bit_vec;
 extern crate rand;

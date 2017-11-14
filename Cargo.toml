@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["ivan tkachenko <ratijas@users.noreply.github.com>"]
 
 [dependencies]
+# log
+log = "0.3"
+
 # bits
 bit-vec = "0.4.4"
 rand = "0.3"
