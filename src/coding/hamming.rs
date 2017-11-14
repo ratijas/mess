@@ -34,7 +34,7 @@ impl Coding for Hamming {
 
     fn decode(&self, mut input: BitVec) -> (BitVec, Stats) {
         let mut stats = Stats::new();
-        let len = input.iter().count();
+        let len = input.len();
         let result_len = (len / 7) * 4 + if len % 7 == 3 { 1 } else if len % 7 > 3 { len % 7 - 3 } else { 0 };
 
         let mut result = BitVec::from_elem(result_len, false);
@@ -51,7 +51,7 @@ impl Coding for Hamming {
             if b[4] ^ b[5] ^ b[6] != b[3] { diff += 4 };
             if diff > 0 {
                 diff -= 1;
-                input.set(diff + 7 * i, !b[diff]);
+                if diff + 7 * i < len { input.set(diff + 7 * i, !b[diff]) };
                 stats.detected += 1;
                 stats.corrected += 1;
             }
