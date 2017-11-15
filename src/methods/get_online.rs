@@ -5,13 +5,13 @@ use ::types;
 
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
-pub struct Online {}
+pub struct GetOnline {}
 
 
-impl Method for Online {
+impl Method for GetOnline {
     type Answer = types::Online;
 
     fn endpoint(&self) -> &'static str {
-        "online"
+        "getOnline"
     }
 }

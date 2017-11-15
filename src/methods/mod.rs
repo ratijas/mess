@@ -1,6 +1,6 @@
 //! server methods:
 //! - `login username:string = LoginResult`
-//! - `online = Online`
+//! - `getOnline = Online`
 //! - `getUpdates username:string = Updates`
 //! - `sendFile = FileId`
 //! - `sendText from:Username to:Username payload:Data = Bool`
@@ -21,7 +21,7 @@ pub use super::types::Username;
 use super::types::GeneralAnswer;
 
 pub mod login;
-pub mod online;
+pub mod get_online;
 pub mod get_updates;
 pub mod send_file;
 pub mod send_text;
@@ -29,7 +29,7 @@ pub mod upload_file;
 pub mod download_file;
 
 pub use self::login::Login;
-pub use self::online::Online;
+pub use self::get_online::GetOnline;
 pub use self::get_updates::GetUpdates;
 pub use self::send_file::SendFile;
 pub use self::send_text::SendText;
