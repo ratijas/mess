@@ -14,7 +14,7 @@ pub struct SendText {
 impl Method for SendText {
     type Answer = bool;
 
-    fn endpoint(&self) -> &'static str {
+    fn endpoint() -> &'static str {
         "sendText"
     }
 }

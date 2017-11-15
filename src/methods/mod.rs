@@ -40,7 +40,7 @@ pub use self::download_file::DownloadFile;
 pub trait Method: Serialize + DeserializeOwned {
     type Answer: Serialize + DeserializeOwned + Clone + ::std::fmt::Debug;
 
-    fn endpoint(&self) -> &'static str;
+    fn endpoint() -> &'static str;
 }
 
 
@@ -101,6 +101,6 @@ impl<M> ClientMethod for M
     fn invoke_raw<T>(&self, target: &T) -> reqwest::Result<reqwest::Response>
         where T: Target
     {
-        target.perform(self.endpoint(), &self)
+        target.perform(M::endpoint(), &self)
     }
 }

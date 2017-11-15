@@ -12,7 +12,7 @@ pub struct Login {
 impl Method for Login {
     type Answer = types::LoginResult;
 
-    fn endpoint(&self) -> &'static str {
+    fn endpoint() -> &'static str {
         "login"
     }
 }

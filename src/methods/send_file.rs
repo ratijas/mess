@@ -11,7 +11,7 @@ pub struct SendFile {}
 impl Method for SendFile {
     type Answer = types::FileId;
 
-    fn endpoint(&self) -> &'static str {
+    fn endpoint() -> &'static str {
         "sendFile"
     }
 }

@@ -15,7 +15,7 @@ pub struct UploadFile {
 impl Method for UploadFile {
     type Answer = bool;
 
-    fn endpoint(&self) -> &'static str {
+    fn endpoint() -> &'static str {
         "uploadFile"
     }
 }

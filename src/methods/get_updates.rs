@@ -12,7 +12,7 @@ pub struct GetUpdates {
 impl Method for GetUpdates {
     type Answer = types::Updates;
 
-    fn endpoint(&self) -> &'static str {
+    fn endpoint() -> &'static str {
         "getUpdates"
     }
 }
