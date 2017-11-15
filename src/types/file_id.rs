@@ -2,6 +2,7 @@
 //!     * `FileId file_id:int = FileId`
 
 #[derive(Clone, Debug)]
+#[derive(Hash, Eq, PartialEq)]
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum FileId {
