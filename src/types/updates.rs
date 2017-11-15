@@ -1,9 +1,9 @@
 //! - `Updates`
 //!     * `Updates updates:Vector<Update> = Updates`
 
-use super::Update;
+use super::*;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Updates {

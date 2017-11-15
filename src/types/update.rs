@@ -1,21 +1,23 @@
 //! - `Update`
-//!     * `TextUpdate from:Username to:Username coding:string compression:string text:string = Update`
-//!     * `FileUpdate from:Username to:Username coding:string compression:string file:FileMeta file_id:FileId = Update`
+//!     * `TextUpdate from:Username to:Username payload:Data = Update`
+//!     * `FileUpdate from:Username to:Username file:FileMeta file_id:FileId payload:Data = Update`
 
-use super::Username;
-use super::base64;
+use super::*;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Update {
     TextUpdate {
         from: Username,
         to: Username,
-        coding: String,
-        compression: String,
-        #[serde(with = "base64")]
-        text: Vec<u8>,
+        payload: Data,
     },
-    // TODO
+    FileUpdate {
+        from: Username,
+        to: Username,
+        file: FileMeta,
+        file_id: FileId,
+        payload: Data,
+    },
 }

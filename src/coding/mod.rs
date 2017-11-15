@@ -6,6 +6,7 @@ pub mod hamming;
 use bit_vec::BitVec;
 
 
+#[derive(Clone, Debug)]
 pub struct Stats {
     pub detected: u32,
     pub corrected: u32,
