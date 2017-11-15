@@ -66,6 +66,16 @@ pub use self::compression::Compression;
 
 pub type Username = String;
 
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+pub enum GeneralAnswer<T>
+    where T: Clone + ::std::fmt::Debug
+{
+    #[serde(rename = "result")]
+    Ok(T),
+    #[serde(rename = "description")]
+    Err(String),
+}
 
 pub mod base64 {
     extern crate base64;
@@ -83,5 +93,25 @@ pub mod base64 {
     {
         let s = <&str>::deserialize(deserializer)?;
         base64::decode(s).map_err(de::Error::custom)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn serde() {
+        let err: GeneralAnswer<()> = GeneralAnswer::Err("bad stuff".into());
+        let str = serde_json::to_string(&err).unwrap();
+
+        assert_eq!(r#"{"description":"bad stuff"}"#, str);
+
+        let answer: GeneralAnswer<()> = serde_json::from_str(&str).unwrap();
+        match answer {
+            GeneralAnswer::Ok(_) => unreachable!(),
+            GeneralAnswer::Err(s) => assert_eq!(s, "bad stuff"),
+        }
     }
 }

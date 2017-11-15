@@ -18,6 +18,7 @@ use reqwest;
 
 pub use super::types::base64;
 pub use super::types::Username;
+use super::types::GeneralAnswer;
 
 pub mod login;
 pub mod online;
@@ -37,7 +38,7 @@ pub use self::download_file::DownloadFile;
 
 
 pub trait Method: Serialize + DeserializeOwned {
-    type Answer: Serialize + DeserializeOwned + ::std::fmt::Debug;
+    type Answer: Serialize + DeserializeOwned + Clone + ::std::fmt::Debug;
 
     fn endpoint(&self) -> &'static str;
 }
@@ -55,7 +56,7 @@ pub enum ClientError {
     IoError(io::Error),
     Utf8Error(str::Utf8Error),
     SerdeJson(serde_json::Error),
-    ServerError(Option<String>),
+    ServerError(String),
 }
 
 
@@ -69,15 +70,6 @@ pub trait Target {
 /// Server side errors must be returned as a properly constructed `Answer`.
 pub trait ServerMethod<Ctx>: Method {
     fn handle(self, context: &mut Ctx) -> Self::Answer;
-}
-
-
-#[derive(Debug)]
-#[derive(Deserialize)]
-struct GeneralAnswer<T: ::std::fmt::Debug> {
-    ok: bool,
-    result: Option<T>,
-    description: Option<String>,
 }
 
 
@@ -96,14 +88,14 @@ impl<M> ClientMethod for M
 
         debug!("response: {}", body);
 
-        let json: GeneralAnswer<Self::Answer> = serde_json::from_str(body).map_err(ClientError::SerdeJson)?;
+        let answer: GeneralAnswer<Self::Answer> = serde_json::from_str(body).map_err(ClientError::SerdeJson)?;
 
-        debug!("json: {:?}", json);
+        debug!("json: {:?}", answer);
 
-        if !json.ok {
-            return Err(ClientError::ServerError(json.description));
+        match answer {
+            GeneralAnswer::Ok(result) => Ok(result),
+            GeneralAnswer::Err(description) => Err(ClientError::ServerError(description)),
         }
-        Ok(json.result.ok_or(ClientError::ServerError(None))?)
     }
 
     fn invoke_raw<T>(&self, target: &T) -> reqwest::Result<reqwest::Response>
