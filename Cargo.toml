@@ -7,10 +7,18 @@ authors = ["valeev-aidar <ai.valeev@innopolis.ru>"]
 iron = "^0.5"
 router = "^0.5"
 persistent = "^0.3"
+error = "0.1"
 
 typemap = "0.3.3"
+
+log = "0.3"
+fern = "0.4"
+chrono = "0.4"
 
 serde = "^1.0"
 serde_derive = "^1.0"
 serde_json = "^1.0"
 base64 = "0.7.0"
+
+[dependencies.algos]
+path = "../mess-algos"

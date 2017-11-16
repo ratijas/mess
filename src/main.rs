@@ -1,81 +1,45 @@
-//!
-//! server constructors, types:
-//! - `int = i32`
-//! - `Bool`
-//!     * `True = Bool`
-//!     * `False = Bool`
-//! - `bytes`
-//!     * b64 encoded string
-//!
-//! - `Vector<T>`
-//!
-//! - `LoginResult`
-//!     * `LoginOk username:string = LoginResult`
-//!     * `LoginErr = LoginResult`
-//!
-//! - `Online`
-//!     * `Online users:Vector<Username> = Online`
-//!
-//! - `Updates`
-//!     * `Updates updates:Vector<Update> = Updates`
-//!
-//! - `Update`
-//!     * `TextUpdate from:Username to:Username coding:string compression:string text:string = Update`
-//!     * `FileUpdate from:Username to:Username coding:string compression:string file:FileMeta file_id:FileId = Update`
-//!
-//! - `FileMeta`:
-//!     * `FileMeta name:string size:int mime:string = FileMeta`
-//!
-//! - `FileId`
-//!     * `FileId file_id:int = FileId`
-//!
-//!
-//! server methods:
-//! - `login username:string = LoginResult`
-//! - `online = Online`
-//! - `getUpdates username:string = Updates`
-//! - `sendText from:Username to:Username coding:string compression:string text:string = Bool`
-//! - `sendFile = FileId`
-//! - `uploadFile from:Username to:Username coding:string compression:string file:FileMeta file_id:FileId bytes:bytes = Bool`
-//! - `downloadFile file_id:FileId = bytes`
-//!
-//!
-#[allow(unused)]
 extern crate iron;
 extern crate router;
 extern crate persistent;
-
+extern crate error as e;
 extern crate typemap;
 
-use typemap::Key;
-use persistent::State;
-
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
 extern crate serde_json;
+extern crate serde;
 
-use serde::Serialize;
+#[macro_use]
+extern crate log;
+extern crate fern;
+extern crate chrono;
+
+extern crate algos;
 
 use iron::prelude::*;
-use iron::status;
+use iron::{headers, status};
+use iron::modifiers::Header;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
-
 use std::io::Read;
 
-use types::*;
-use methods::*;
+use typemap::Key;
+use persistent::State;
+
+use algos::methods::*;
+use algos::types::*;
+
+pub mod server;
 
 #[derive(Debug)]
 pub struct App {
     pub users: HashMap<Username, User>,
+    /// set of requested but not yet uploaded files
     pub pending: HashSet<FileId>,
+    /// set of uploaded files waiting for receiver to fetch them
     pub files: HashMap<FileId, File>,
-    pub last_id: i32,
+    /// last used file id
+    pub last_id: i64,
 }
 
 #[derive(Debug)]
@@ -87,7 +51,7 @@ pub struct User {
 #[derive(Debug)]
 pub struct File {
     pub meta: FileMeta,
-    pub content: String,
+    pub payload: Data,
 }
 
 pub struct JsonKey;
@@ -128,305 +92,105 @@ impl User {
     }
 }
 
-fn main() {
-    let mut router = router::Router::new();
-    router.post("/", default, "default");
+fn app_handler() -> Chain {
+    let mut r = router::Router::new();
+    r.post("/", default, "default");
 
-    router.post("/login", handle_method::<Login>, "login");
-    router.post("/online", handle_method::<GetOnline>, "online");
-    router.post("/getUpdates", handle_method::<GetUpdates>, "getUpdates");
-    router.post("/sendText", handle_method::<SendText>, "sendText");
-    router.post("/sendFile", handle_method::<SendFile>, "sendFile");
-    router.post("/uploadFile", handle_method::<UploadFile>, "uploadFile");
-    router.post("/downloadFile", handle_method::<DownloadFile>, "downloadFile");
+    fn route<M: 'static + ServerMethod<App>>(r: &mut router::Router) {
+        r.get(&format!("/{}", M::endpoint()), handle_method::<M>, M::endpoint());
+        r.post(&format!("/{}", M::endpoint()), handle_method::<M>, M::endpoint());
+    }
 
-    let mut chain = Chain::new(router);
+    route::<Login>(&mut r);
+    route::<GetOnline>(&mut r);
+    route::<GetUpdates>(&mut r);
+    route::<SendText>(&mut r);
+    route::<SendFile>(&mut r);
+    route::<UploadFile>(&mut r);
+    route::<DownloadFile>(&mut r);
+
+    let mut chain = Chain::new(r);
     chain.link(State::<App>::both(App::new()));
 
-    // every query is json
-    chain.link_before(|req: &mut Request| -> IronResult<()> {
-        let mut body = Vec::new();
-        if let Ok(_) = req.body.read_to_end(&mut body) {
-            if let Ok(json) = serde_json::from_slice(&body) {
-                req.extensions.insert::<JsonKey>(json);
-            }
-        }
-        Ok(())
+    // every response is a json
+    chain.link_after(|_: &mut Request, res: Response| -> IronResult<Response> {
+        let res = res.set(Header(headers::ContentType::json()));
+        Ok(res)
     });
 
-    Iron::new(chain).http("0.0.0.0:3000").unwrap();
+    chain
 }
 
-fn bad_request() -> IronResult<Response> {
-    Ok(Response::with((
-        status::Ok,
-        err_description("bad request").to_string()
-    )))
-}
-
-fn ok_result<T: Serialize>(result: T) -> serde_json::Value {
-    json!({
-        "ok": true,
-        "result": result,
-    })
-}
-
-fn err_description<T: Serialize>(err: T) -> serde_json::Value {
-    json!({
-        "ok": false,
-        "description": err,
-    })
-}
-
-fn default(_: &mut Request) -> IronResult<Response> {
-    println!("imitating 5 seconds delay");
-    ::std::thread::sleep(::std::time::Duration::from_secs(5));
-    Ok(Response::with((status::Ok, json!({
-        "ok": false
-    }).to_string())))
-}
-
-fn handle_method<M: Method>(req: &mut Request) -> IronResult<Response> {
-    let m: M = match req.extensions
-                        .remove::<JsonKey>()
-                        .map(serde_json::from_value)
-                        .and_then(Result::ok) {
-        None => return bad_request(),
-        Some(m) => m,
+fn handle_method<M: ServerMethod<App>>(req: &mut Request) -> IronResult<Response> {
+    let method: M = match parse_method(req) {
+        Ok(m) => m,
+        Err(body) => {
+            error!("body is not a json! {:?} {:?}", req, body);
+            return bad_request();
+        }
     };
 
     let answer: M::Answer = {
         let lock = req.get::<State<App>>().unwrap();
         let mut app = lock.write().unwrap();
+        let res = method.handle(&mut app);
 
-        let res = m.invoke(&mut app);
-
-        println!("app: {:?}", &*app);
+        debug!("app: {:?}", &*app);
 
         res
     };
 
-    let res = ok_result(answer);
-
-    Ok(Response::with((status::Ok, serde_json::to_string(&res).unwrap())))
+    Ok(Response::with((status::Ok,
+                       serde_json::to_string(&GeneralAnswer::Ok(answer)).unwrap())))
 }
 
-pub mod base64 {
-    extern crate base64;
+fn parse_method<M: Method>(req: &mut Request) -> Result<M, Vec<u8>> {
+    let mut body = Vec::new();
+    if let Ok(_) = req.body.read_to_end(&mut body) {
+        if body.is_empty() {
+            body.extend(b"{}");
+        }
 
-    use serde::{Serializer, de, Deserialize, Deserializer};
-
-    pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        serializer.serialize_str(&base64::encode(bytes))
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-        where D: Deserializer<'de>
-    {
-        let s = <&str>::deserialize(deserializer)?;
-        base64::decode(s).map_err(de::Error::custom)
+        serde_json::from_slice(&body).map_err(|_| body)
+    } else {
+        Err(body)
     }
 }
 
-pub mod types {
-    use super::base64;
-
-    pub type Username = String;
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum LoginResult {
-        LoginOk { username: String },
-        LoginErr,
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum Online {
-        Online { users: Vec<Username> }
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum Update {
-        TextUpdate {
-            from: Username,
-            to: Username,
-            coding: String,
-            compression: String,
-            #[serde(with = "base64")]
-            text: Vec<u8>
-        },
-        FileUpdate { from: Username, to: Username, coding: String, compression: String, file: FileMeta, file_id: FileId },
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum Updates {
-        Updates { updates: Vec<Update> }
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum SentUpdate {
-        SentText,
-        SentFile { file_id: i32 }
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum FileMeta {
-        FileMeta { name: String, size: i32, mime: String }
-    }
-
-    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-    #[derive(Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum FileId {
-        FileId { file_id: i32 }
-    }
+fn bad_request() -> IronResult<Response> {
+    let answer: GeneralAnswer<()> = GeneralAnswer::Err("bad request".into());
+    Ok(Response::with((
+        status::Ok,
+        serde_json::to_string(&answer).unwrap(),
+    )))
 }
 
-pub mod methods {
-    use super::*;
-    use serde::de::DeserializeOwned;
+fn default(_: &mut Request) -> IronResult<Response> {
+    println!("imitating 5 seconds delay");
+    ::std::thread::sleep(::std::time::Duration::from_secs(5));
+    bad_request()
+}
 
-    pub trait Method: DeserializeOwned {
-        type Answer: Serialize;
-        fn invoke(self, app: &mut App) -> Self::Answer;
-    }
+pub fn setup_log(level: log::LogLevelFilter) {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .level(level)
+        .chain(std::io::stdout())
+        .apply()
+        .unwrap();
+}
 
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    pub struct Login {
-        pub username: Username,
-    }
+fn main() {
+    setup_log(log::LogLevelFilter::Info);
 
-    impl Method for Login {
-        type Answer = LoginResult;
-
-        fn invoke(self, app: &mut App) -> LoginResult {
-            if !User::validate_username(&self.username) {
-                return LoginResult::LoginErr;
-            }
-
-            let user = app.get_or_new_user(self.username);
-
-            LoginResult::LoginOk { username: user.username.clone() }
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    pub struct GetOnline {}
-
-    impl Method for GetOnline {
-        type Answer = Online;
-
-        fn invoke(self, app: &mut App) -> Online {
-            Online::Online { users: app.users.keys().cloned().collect() }
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    pub struct GetUpdates {
-        pub username: Username,
-    }
-
-    impl Method for GetUpdates {
-        type Answer = Updates;
-
-        fn invoke(self, app: &mut App) -> Updates {
-            let user: &mut User = app.get_or_new_user(self.username.clone());
-            let updates: Vec<Update> = user.inbox.drain(..).collect();
-            let result = Updates::Updates { updates };
-            result
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    pub struct SendText {
-        pub from: Username,
-        pub to: Username,
-        pub coding: String,
-        pub compression: String,
-        pub text: String,
-    }
-
-    impl Method for SendText {
-        type Answer = bool;
-
-        fn invoke(self, app: &mut App) -> bool {
-            if self.to == self.from || !app.users.contains_key(&self.to) { return false; };
-            app.users.get_mut(&self.to).unwrap().inbox.push_back(Update::TextUpdate
-                { from: self.from, to: self.to, coding: self.coding, compression: self.compression, text: self.text.into_bytes() });
-            true
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    pub struct SendFile {}
-
-    impl Method for SendFile {
-        type Answer = FileId;
-
-        fn invoke(self, app: &mut App) -> FileId {
-            let file_id = FileId::FileId { file_id: app.last_id };
-            app.last_id += 1;
-            app.pending.insert(file_id.clone());
-            file_id
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    pub struct UploadFile {
-        pub from: Username,
-        pub to: Username,
-        pub coding: String,
-        pub compression: String,
-        pub file: FileMeta,
-        pub file_id: i32,
-        pub bytes: String,
-    }
-
-    impl Method for UploadFile {
-        type Answer = bool;
-
-        fn invoke(self, app: &mut App) -> bool {
-            if self.to == self.from || !app.users.contains_key(&self.to) { return false; };
-            if !app.pending.contains(&FileId::FileId { file_id: self.file_id }) ||
-                app.files.contains_key(&FileId::FileId { file_id: self.file_id }) { return false; };
-            app.files.insert(FileId::FileId { file_id: self.file_id }, File { meta: self.file.clone(), content: self.bytes });
-            app.pending.remove(&FileId::FileId { file_id: self.file_id });
-            app.users.get_mut(&self.to).unwrap().inbox.push_back(Update::FileUpdate
-                { from: self.from, to: self.to, coding: self.coding, compression: self.compression, file: self.file, file_id: FileId::FileId { file_id: self.file_id } });
-            true
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    pub struct DownloadFile {
-        pub file_id: i32,
-    }
-
-    impl Method for DownloadFile {
-        type Answer = String;
-
-        fn invoke(self, app: &mut App) -> String {
-            app.files.get(&FileId::FileId { file_id: self.file_id }).unwrap().content.clone()
-        }
-    }
+    let handler = app_handler();
+    Iron::new(handler).http("0.0.0.0:3000").unwrap();
 }
