@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::path::Path;
 use std::fs;
 use std::result;
 use std::sync::Mutex;
@@ -70,9 +71,14 @@ pub fn create_schema() -> ::Result<()> {
 
 
 impl File {
-    pub fn for_dir_entry(entry: &fs::DirEntry) -> super::Result<File> {
+    pub fn for_dir_entry(entry: &fs::DirEntry, remove_prefix: &Path) -> super::Result<File> {
+        let as_str = remove_prefix.to_str().unwrap();
+        let mut path = entry.path().into_os_string().into_string()?;
+        if path.starts_with(as_str) {
+            path = path[as_str.len()..].to_string();
+        }
         Ok(File {
-            file_name: entry.path().into_os_string().into_string()?,
+            file_name: path,
             file_type: mime_guess::guess_mime_type(entry.path()),
             file_size: 8 * entry.metadata()?.len() as i64,
         })

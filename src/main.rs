@@ -47,7 +47,7 @@ fn run() -> Result<()> {
     let pool = ThreadPool::new(n_workers);
 
     for entry in files(&data_dir)? {
-        let db_file = db::File::for_dir_entry(&entry)?;
+        let db_file = db::File::for_dir_entry(&entry, data_dir.as_path())?;
         db_file.save()?;
 
         let path = entry.path();
