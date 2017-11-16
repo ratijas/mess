@@ -29,6 +29,8 @@ pub struct Compression {
     pub compression: String,
     pub compress_rate: f64,
     pub size_compressed: i64,
+    pub time_compress: i64,
+    pub time_decompress: Option<i64>,
 }
 
 #[derive(Debug)]
@@ -43,25 +45,27 @@ pub struct Coding {
     pub corrected: i64,
     pub detected: i64,
     pub not_corrected: i64,
+    pub time_encode: i64,
+    pub time_decode: i64,
 }
 
-pub fn connection<F, T>(f: F) -> Result<T>
-    where F: FnOnce(&Connection) -> Result<T>
+pub fn connection<F, T, E>(f: F) -> result::Result<T, E>
+    where F: FnOnce(&Connection) -> result::Result<T, E>
 {
-    let guard = GLOBAL_CONNECTION.lock().map_err(|_| Error::SqliteSingleThreadedMode)?;
+    let guard = GLOBAL_CONNECTION.lock().unwrap();
     f(&*guard)
 }
 
-pub fn create_schema() -> result::Result<(), ()> {
-    let conn = GLOBAL_CONNECTION.lock().map_err(drop)?;
+pub fn create_schema() -> ::Result<()> {
+    connection(|conn| {
+        let mut f = fs::File::open(SCHEMA)?;
+        let mut schema = String::new();
+        f.read_to_string(&mut schema)?;
 
-    let mut f = fs::File::open(SCHEMA).map_err(drop)?;
-    let mut schema = String::new();
-    f.read_to_string(&mut schema).map_err(drop)?;
+        conn.execute_batch(&schema)?;
 
-    conn.execute_batch(&schema).map_err(drop)?;
-
-    Ok(())
+        Ok(())
+    })
 }
 
 
@@ -96,7 +100,7 @@ impl File {
     pub fn save(&self) -> Result<()> {
         connection(|conn| {
             let sql = "
-                INSERT OR REPLACE INTO `file` (`file_name`, `file_type`, `file_size`)
+                INSERT OR REPLACE INTO file (file_name, file_type, file_size)
                                 VALUES (?1, ?2, ?3)
             ";
             let mut stmt = conn.prepare_cached(sql)?;
@@ -117,8 +121,10 @@ impl Compression {
             INSERT OR REPLACE INTO compression (file_name,
                                                 compression,
                                                 compress_rate,
-                                                size_compressed)
-                            VALUES (?1, ?2, ?3, ?4)
+                                                size_compressed,
+                                                time_compress,
+                                                time_decompress)
+                            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             ";
             let mut stmt = conn.prepare_cached(sql)?;
             stmt.execute(&[
@@ -126,6 +132,8 @@ impl Compression {
                 &self.compression,
                 &self.compress_rate,
                 &self.size_compressed,
+                &self.time_compress,
+                &self.time_decompress,
             ])?;
             Ok(())
         })
@@ -141,7 +149,7 @@ impl Coding {
     {
         connection(|conn| {
             let sql = "\
-                SELECT redundancy_rate, size_decoded, size_encoded, corrected, detected, not_corrected
+                SELECT redundancy_rate, size_decoded, size_encoded, corrected, detected, not_corrected, time_encode, time_decode
                   FROM coding
                  WHERE file_name = ?1
                    AND coding_name = ?2
@@ -162,6 +170,8 @@ impl Coding {
                         corrected: row.get(3),
                         detected: row.get(4),
                         not_corrected: row.get(5),
+                        time_encode: row.get(6),
+                        time_decode: row.get(7),
                     }
                 })
         })
@@ -179,8 +189,10 @@ impl Coding {
                                            size_encoded,
                                            corrected,
                                            detected,
-                                           not_corrected)
-                            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                                           not_corrected,
+                                           time_encode,
+                                           time_decode)
+                            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             ";
             let mut stmt = conn.prepare_cached(sql)?;
             stmt.execute(&[
@@ -194,6 +206,8 @@ impl Coding {
                 &self.corrected,
                 &self.detected,
                 &self.not_corrected,
+                &self.time_encode,
+                &self.time_decode,
             ])?;
             Ok(())
         })

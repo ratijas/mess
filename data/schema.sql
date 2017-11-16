@@ -15,6 +15,8 @@ CREATE TABLE `compression` (
   `compression`     TEXT    NOT NULL CHECK (`compression` IN ('huffman', 'rle', 'shannon')),
   `compress_rate`   REAL    NOT NULL,
   `size_compressed` INTEGER NOT NULL,
+  `time_compress`   INTEGER NOT NULL,
+  `time_decompress` INTEGER, -- could be NULL if decompression failed
   PRIMARY KEY (`file_name`, `compression`),
   FOREIGN KEY (`file_name`) REFERENCES `file` (`file_name`)
 );
@@ -31,6 +33,8 @@ CREATE TABLE `coding` (
   `corrected`       INTEGER NOT NULL,
   `detected`        INTEGER NOT NULL CHECK (`corrected` <= `detected`),
   `not_corrected`   INTEGER NOT NULL CHECK (`not_corrected` <= `size_decoded`),
+  `time_encode`     INTEGER NOT NULL,
+  `time_decode`     INTEGER NOT NULL,
   PRIMARY KEY (`file_name`, `compression`, `coding_name`, `noise_rate`),
   FOREIGN KEY (`file_name`) REFERENCES `file` (`file_name`),
   FOREIGN KEY (`file_name`, `compression`) REFERENCES `compression` (`file_name`, `compression`)

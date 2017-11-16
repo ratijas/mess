@@ -1,8 +1,3 @@
-use std::path::PathBuf;
-use std::fs::{self};
-use std::io::{Read, Write};
-use std::sync::Arc;
-
 #[macro_use]
 extern crate lazy_static;
 extern crate bit_vec;
@@ -11,12 +6,16 @@ extern crate mime;
 extern crate mime_guess;
 extern crate threadpool;
 extern crate num_cpus;
+extern crate algos;
+
+use std::path::PathBuf;
+use std::fs::{self};
+use std::io::{Read, Write};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use bit_vec::BitVec;
 use threadpool::ThreadPool;
-
-
-extern crate algos;
 
 use algos::compression::Compression;
 use algos::compression::rle::*;
@@ -33,7 +32,6 @@ use algos::noise::NoiseLevel;
 
 mod db;
 
-type Error = &'static str;
 type Result<T> = std::result::Result<T, Error>;
 
 fn main() {
@@ -49,15 +47,16 @@ fn run() -> Result<()> {
     let pool = ThreadPool::new(n_workers);
 
     for entry in files(&data_dir)? {
-        let db_file = db::File::for_dir_entry(&entry).map_err(|_| "io error")?;
-        db_file.save().map_err(|_| "sqlite")?;
+        let db_file = db::File::for_dir_entry(&entry)?;
+        db_file.save()?;
 
         let path = entry.path();
+
         // println!("path: {}", path.to_str().ok_or("path")?);
 
-        let mut file = fs::File::open(path).map_err(|_| "open file")?;
+        let mut file = fs::File::open(path)?;
         let mut content: Vec<u8> = Vec::new();
-        file.read_to_end(&mut content).map_err(|_| "read file")?;
+        file.read_to_end(&mut content)?;
         let content = Arc::new(content);  // non-mutable shared
 
         {
@@ -143,16 +142,21 @@ pub fn live_with_it(compression_name: &str,
 {
     // println!("compression: {}", compression_name);
 
-    let compressed = compression.compress(original).map_err(|_| "compression")?;
+    let (compressed, time_compress) = profile(|| {
+        Ok(compression.compress(original)?)
+    })?;
+
     // println!(" compressed: {:?}", &compressed);
 
-    let c = db::Compression {
+    let mut c = db::Compression {
         file_name: db_file.file_name.clone(),
         compression: compression_name.into(),
         compress_rate: compressed.len() as f64 / (8 * original.len()) as f64,
         size_compressed: compressed.len() as i64,
+        time_compress,
+        time_decompress: None,
     };
-    c.save().map_err(|_| "save compression")?;
+    c.save()?;
 
     for &(coding, coding_name) in [
         (&Repetition3 as &Coding, "r3"),
@@ -162,7 +166,10 @@ pub fn live_with_it(compression_name: &str,
     ].iter() {
         // println!("    coding: {}", coding_name);
 
-        let encoded = coding.encode(compressed.clone());
+        let (encoded, time_encode) = profile(|| {
+            Ok(coding.encode(compressed.clone()))
+        })?;
+
         // println!("    encoded: {:?}", &encoded);
 
         let redundancy_rate = encoded.len() as f64 / (compressed.len()) as f64;
@@ -175,14 +182,18 @@ pub fn live_with_it(compression_name: &str,
             // println!("      nioSe: {:?}", noise);
 
             let fucked_up: BitVec = noise.apply(encoded.iter()).collect();
+
             // println!("  fucked up: {:?}", &fucked_up);
 
-            let (decoded, stats) = coding.decode(fucked_up);
-            // println!("    decoded: {:?}", &decoded);
+            let ((decoded, stats), time_decode) = profile(move || {
+                Ok(coding.decode(fucked_up))
+            })?;
 
+            // println!("    decoded: {:?}", &decoded);
             // println!("    det/cor: {}/{}", stats.detected, stats.corrected);
 
             let dist = distance(&compressed, &decoded);
+
             // println!("   distance: {}", dist);
 
             let coding = db::Coding {
@@ -196,13 +207,24 @@ pub fn live_with_it(compression_name: &str,
                 corrected: stats.corrected as i64,
                 detected: stats.detected as i64,
                 not_corrected: dist as i64,
+                time_encode,
+                time_decode,
             };
-            coding.save().map_err(|_| "save coding")?;
+            coding.save()?;
 
-            let _decompressed = Rle.decompress(decoded);
+            match profile(|| Ok(compression.decompress(decoded)?)) {
+                Ok((_decompressed, time_decompress)) => {
+                    if c.time_decompress == None {
+                        c.time_decompress = Some(time_decompress);
+                        c.save()?;
+                    }
+                }
+                Err(_) => {}
+            }
+
             /*
             match decompressed {
-                Ok(ref vec) => {
+                Ok(_) => {
                     // let decompressed = BitVec::from_bytes(&vec);
                     // // println!("decompressed {:?}", &decompressed);
 
@@ -212,14 +234,62 @@ pub fn live_with_it(compression_name: &str,
                     // println!("result:");
                     // std::io::stdout().write(&vec).unwrap();
                 }
-                Err(ref e) => println!("decompress error: {:?}", e),
+                Err(_) => {} // println!("decompress error: {:?}", e),
             }
             */
-            std::io::stdout().write(b".").unwrap();
-            std::io::stdout().flush().unwrap();
+
+            std::io::stdout().write(b".")?;
+            std::io::stdout().flush()?;
         }
     }
-    std::io::stdout().write(b"\n").unwrap();
-    std::io::stdout().flush().unwrap();
+    std::io::stdout().write(b"\n")?;
+    std::io::stdout().flush()?;
     Ok(())
+}
+
+fn elapsed_millis(instant: Instant) -> i64 {
+    let elapsed: Duration = instant.elapsed();
+    let millis = 1000 * elapsed.as_secs() as i64;
+    millis + (elapsed.subsec_nanos() as i64 / 1_000_000_i64)
+}
+
+fn profile<F, T>(f: F) -> Result<(T, i64)>
+    where F: FnOnce() -> Result<T>
+{
+    let instant = Instant::now();
+    let result = f()?;
+    Ok((result, elapsed_millis(instant)))
+}
+
+// error chain
+#[derive(Debug)]
+pub enum Error {
+    Sql(rusqlite::Error),
+    Str(&'static str),
+    Compression(algos::compression::Error),
+    Io(std::io::Error),
+}
+
+impl From<rusqlite::Error> for Error {
+    fn from(e: rusqlite::Error) -> Self {
+        Error::Sql(e)
+    }
+}
+
+impl From<&'static str> for Error {
+    fn from(s: &'static str) -> Self {
+        Error::Str(s)
+    }
+}
+
+impl From<algos::compression::Error> for Error {
+    fn from(e: algos::compression::Error) -> Self {
+        Error::Compression(e)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::Io(e)
+    }
 }
