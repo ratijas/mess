@@ -7,7 +7,7 @@ use ::types;
 pub struct UploadFile {
     pub from: types::Username,
     pub to: types::Username,
-    pub file: types::FileMeta,
+    pub meta: types::FileMeta,
     pub file_id: types::FileId,
     pub payload: types::Data,
 }

@@ -16,7 +16,7 @@ pub enum Update {
     FileUpdate {
         from: Username,
         to: Username,
-        file: FileMeta,
+        meta: FileMeta,
         file_id: FileId,
         payload: Data,
     },
