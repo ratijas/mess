@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io::Read;
 use std::fs;
 use std::result;
 use std::sync::Mutex;
@@ -70,9 +70,9 @@ pub fn create_schema() -> ::Result<()> {
 
 
 impl File {
-    pub fn for_dir_entry(entry: &fs::DirEntry) -> io::Result<File> {
+    pub fn for_dir_entry(entry: &fs::DirEntry) -> super::Result<File> {
         Ok(File {
-            file_name: entry.path().into_os_string().into_string().map_err(|_| io::Error::from(io::ErrorKind::Other))?,
+            file_name: entry.path().into_os_string().into_string()?,
             file_type: mime_guess::guess_mime_type(entry.path()),
             file_size: 8 * entry.metadata()?.len() as i64,
         })

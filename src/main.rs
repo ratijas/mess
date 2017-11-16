@@ -39,7 +39,7 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    db::create_schema().map_err(|_| "schema initialization failed")?;
+    db::create_schema()?;
 
     let data_dir = PathBuf::from("./data/files/");
 
@@ -113,8 +113,7 @@ pub fn distance_vec(lhs: &[u8], rhs: &[u8]) -> usize {
 }
 
 pub fn files(data_dir: &PathBuf) -> Result<Vec<fs::DirEntry>> {
-    let vec = fs::read_dir(data_dir)
-        .map_err(|_| "unable to open contacts file")?
+    let vec = fs::read_dir(data_dir)?
         .filter_map(::std::result::Result::ok)
         .flat_map(|entry| {
             let ty = entry.file_type().unwrap();
@@ -268,6 +267,7 @@ pub enum Error {
     Str(&'static str),
     Compression(algos::compression::Error),
     Io(std::io::Error),
+    OsString(std::ffi::OsString),
 }
 
 impl From<rusqlite::Error> for Error {
@@ -291,5 +291,11 @@ impl From<algos::compression::Error> for Error {
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
         Error::Io(e)
+    }
+}
+
+impl From<std::ffi::OsString> for Error {
+    fn from(s: std::ffi::OsString) -> Self {
+        Error::OsString(s)
     }
 }
