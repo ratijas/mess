@@ -4,7 +4,7 @@
 //! - `getUpdates username:string = Updates`
 //! - `sendFile = FileId`
 //! - `sendText from:Username to:Username payload:Data = Bool`
-//! - `uploadFile from:Username to:Username file:FileMeta file_id:FileId payload:Data = Bool`
+//! - `uploadFile from:Username to:Username meta:FileMeta file_id:FileId payload:Data = Bool`
 //! - `downloadFile file_id:FileId = Data`
 
 use std::str;

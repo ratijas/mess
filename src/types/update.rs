@@ -1,6 +1,6 @@
 //! - `Update`
 //!     * `TextUpdate from:Username to:Username payload:Data = Update`
-//!     * `FileUpdate from:Username to:Username file:FileMeta file_id:FileId = Update`
+//!     * `FileUpdate from:Username to:Username meta:FileMeta file_id:FileId = Update`
 
 use super::*;
 
