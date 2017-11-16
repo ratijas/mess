@@ -1,6 +1,6 @@
 //! - `Update`
 //!     * `TextUpdate from:Username to:Username payload:Data = Update`
-//!     * `FileUpdate from:Username to:Username file:FileMeta file_id:FileId payload:Data = Update`
+//!     * `FileUpdate from:Username to:Username file:FileMeta file_id:FileId = Update`
 
 use super::*;
 
@@ -18,6 +18,5 @@ pub enum Update {
         to: Username,
         meta: FileMeta,
         file_id: FileId,
-        payload: Data,
     },
 }
