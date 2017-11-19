@@ -1,4 +1,5 @@
 //! Console client for Mess
+
 use ::connection::Connection;
 
 
