@@ -107,7 +107,7 @@ impl File {
         connection(|conn| {
             let sql = "
                 INSERT OR REPLACE INTO file (file_name, file_type, file_size)
-                                VALUES (?1, ?2, ?3)
+                VALUES (?1, ?2, ?3)
             ";
             let mut stmt = conn.prepare_cached(sql)?;
             stmt.execute(&[
@@ -130,7 +130,7 @@ impl Compression {
                                                 size_compressed,
                                                 time_compress,
                                                 time_decompress)
-                            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             ";
             let mut stmt = conn.prepare_cached(sql)?;
             stmt.execute(&[
@@ -198,7 +198,7 @@ impl Coding {
                                            not_corrected,
                                            time_encode,
                                            time_decode)
-                            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             ";
             let mut stmt = conn.prepare_cached(sql)?;
             stmt.execute(&[
