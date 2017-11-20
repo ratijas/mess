@@ -91,13 +91,13 @@ impl<T: Eq + Hash + Clone> Huffman<T> {
 
     fn huffman_raw(p: HashMap<Vec<T>, Probability>) -> HashMap<Vec<T>, BitVec> {
         if p.len() == 2 {
-            return p.into_iter()
-                    .map(|(k, _)| k)
-                    .zip(vec![
-                        BitVec::from_elem(1, false),
-                        BitVec::from_elem(1, true),
-                    ])
-                    .collect();
+            p.into_iter()
+             .map(|(k, _)| k)
+             .zip(vec![
+                 BitVec::from_elem(1, false),
+                 BitVec::from_elem(1, true),
+             ])
+             .collect()
         } else {
             let mut p_prime = p.clone();
             let (e1, e2) = Huffman::<T>::lowest_prob_pair(&p);
