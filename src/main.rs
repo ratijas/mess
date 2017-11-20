@@ -14,36 +14,23 @@ extern crate termion;
 extern crate algos;
 extern crate rand;
 
+mod app;
+mod imports;
+mod connection;
+mod gui;
 
-use tui::Terminal;
-use tui::backend::{Backend, TermionBackend};
-use tui::widgets::{border, Block, Paragraph, Widget, List, SelectableList};
-use tui::layout::{Group, Rect, Size, Direction};
-use tui::style::{Color, Modifier, Style};
-use termion::input::TermRead;
-use termion::event::{Event, Key};
-use termion::screen::AlternateScreen;
 
 // std
 use std::io::{self, Write};
 use std::thread;
-use std::cell::RefCell;
-use std::sync::{Arc, Weak};
-use std::sync::mpsc::{channel, Sender, Receiver};
 
 use algos::types::*;
 use algos::methods::*;
 
+use imports::*;
 use gui::*;
-use gui::window::*;
-use gui::main_view_controller::*;
-use gui::list_view_controller::*;
 
-pub mod client;
-pub mod connection;
-#[macro_use]
-pub mod gui;
-
+#[allow(unused)]
 pub struct App {
     /// Logged in as `username`
     username: Option<Username>,
@@ -67,9 +54,6 @@ pub struct App {
     tx: Sender<AppEvent>,
     /// Application Event bus
     rx: Receiver<AppEvent>,
-
-    // TODO
-    root_view: Boxed<Window>,
 }
 
 pub enum AppEvent {
@@ -78,6 +62,7 @@ pub enum AppEvent {
     Updates(Updates),
 }
 
+#[allow(unused)]
 impl App {
     fn new(t: Terminal<TermionBackend>) -> App {
         let (tx, rx) = channel::<AppEvent>();
@@ -94,8 +79,6 @@ impl App {
             quit: false,
             tx,
             rx,
-            // TODO
-            root_view: Window::new(),
         };
 
         let tx_event = app.tx.clone();
@@ -199,7 +182,7 @@ impl App {
                 self.t.borrow_mut().resize(size)?;
                 self.size = size;
             }
-            (*self.root_view).borrow().render_on_termion(&mut *self.t.borrow_mut(), &self.size);
+            // (*self.root_view).borrow().render_on_termion(&mut *self.t.borrow_mut(), &self.size);
 
             let event = self.rx.recv().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
 
@@ -241,6 +224,7 @@ impl App {
     }
 
     pub fn handle_event(&mut self, event: Event) {
+        /*
         let mut controller: Boxed<ViewController> = (*self.root_view).borrow().active_child_view_controller().upgrade().unwrap();
         // bubble down
         loop {
@@ -266,6 +250,7 @@ impl App {
                 break;
             }
         }
+        */
 
         match event {
             Event::Key(Key::Esc) => self.quit = true,
@@ -329,18 +314,18 @@ impl App {
 
                         SelectableList::default()
                             .items(&self.online)
-                            .select_optional(index)
+                            // .select_optional(index)
                             .highlight_style(Style::default().modifier(Modifier::Invert))
                             .block(Block::default().borders(border::ALL).title("Users online"))
                             .render(t, &chunks[0]);
 
-                        (*self.root_view).borrow().render_on_termion(t, &chunks[1]);
+                        // (*self.root_view).borrow().render_on_termion(t, &chunks[1]);
                     });
 
-                gui::text_field::TextField::default()
-                    .text(&self.status)
-                    .title("Status")
-                    .render(t, &chunks[1]);
+                //                gui::text_field::TextField::default()
+                //                    .text(&self.status)
+                //                    .title("Status")
+                //                    .render(t, &chunks[1]);
             });
 
         self.t.borrow_mut().draw()?;
@@ -348,27 +333,26 @@ impl App {
     }
 }
 
+fn usage() -> ! {
+    let name = env::args().next().unwrap();
+    println!("usage: {} <username> <peer username>", name);
+    ::std::process::exit(1);
+}
+
 fn main() {
-    #[allow(unused)]
-    let screen = AlternateScreen::from(io::stdout());
+    let mut args = env::args().skip(1);
+    let me = match args.next() {
+        Some(ok) => ok,
+        None => usage()
+    };
+    let peer = match args.next() {
+        Some(ok) => ok,
+        None => usage()
+    };
 
-    let backend = TermionBackend::new().unwrap();
-    let mut t = Terminal::new(backend).unwrap();
-    t.hide_cursor().unwrap();
+    let mut app = app::App::new(me, peer);
 
-
-    let app = App::new(t);
-    let _ = app.event_loop().unwrap();
-
-    let backend = TermionBackend::new().unwrap();
-    let mut t = Terminal::new(backend).unwrap();
-
-    t.show_cursor().unwrap();
-    t.clear().unwrap();
-
-    // drop alternative screen, returning to normal
-
-    drop(screen);
+    app.event_loop().unwrap();
 
     /*
 
@@ -389,59 +373,4 @@ fn main() {
         println!("{}. {}", i + 1, user);
     }
     */
-
-    // let peer = prompt("select peer to start chatting: ").unwrap();
-    /*
-    let username_clone = username.clone();
-    let gui_clone = client.clone();
-    let _ = ::std::thread::spawn(move || {
-        loop {
-            ::std::thread::sleep(::std::time::Duration::from_secs(1));
-            let updates: Updates = (methods::GetUpdates { username: username_clone.clone() })
-                .invoke(&gui_clone.connection)
-                .unwrap();
-
-            let updates: Vec<Update> = match updates {
-                Updates::Updates { updates } => updates
-            };
-
-            for update in updates {
-                match update {
-                    Update::TextUpdate { from, text, .. } => {
-                        let base = base64::decode(&text).unwrap();
-                        let text = ::std::str::from_utf8(&base).unwrap();
-                        println!();
-                        println!("new message from {}: {}", from, text);
-                    }
-                    _ => {}
-                }
-            }
-        }
-    });
-    */
-    /*
-    loop {
-        let msg = prompt("type a message: ").unwrap();
-        let sent = (methods::SendText {
-            from: username.clone(),
-            to: peer.clone(),
-            coding: String::new(),
-            compression: String::new(),
-            text: msg.into_bytes(),
-        }).invoke(&client.connection);
-        println!("sent: {:?}", sent);
-    }
-    */
 }
-
-/*
-fn prompt<I: ::std::fmt::Display>(prompt: I) -> Result<String, io::Error> {
-    let mut answer = String::new();
-
-    print!("{}", prompt);
-    io::stdout().flush()?;
-    io::stdin().read_line(&mut answer)?;
-    answer.pop();
-    Ok(answer)
-}
-*/

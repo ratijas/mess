@@ -28,6 +28,12 @@ impl Connection {
     }
 }
 
+impl Default for Connection {
+    fn default() -> Self {
+        Connection::new("0.0.0.0", 3000)
+    }
+}
+
 impl Target for Connection {
     fn perform<I: Serialize>(&self, name: &str, data: &I) -> reqwest::Result<reqwest::Response> {
         self.client.post(&self.url(name))
