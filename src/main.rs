@@ -294,8 +294,6 @@ impl App {
     }
 
     fn draw(&mut self) -> Result<(), io::Error> {
-        // let mut cursor = termion::cursor::Goto::default();
-
         Group::default()
             .direction(Direction::Vertical)
             .margin(0)
@@ -318,14 +316,7 @@ impl App {
                             .highlight_style(Style::default().modifier(Modifier::Invert))
                             .block(Block::default().borders(border::ALL).title("Users online"))
                             .render(t, &chunks[0]);
-
-                        // (*self.root_view).borrow().render_on_termion(t, &chunks[1]);
                     });
-
-                //                gui::text_field::TextField::default()
-                //                    .text(&self.status)
-                //                    .title("Status")
-                //                    .render(t, &chunks[1]);
             });
 
         self.t.borrow_mut().draw()?;
@@ -352,25 +343,19 @@ fn main() {
 
     let mut app = app::App::new(me, peer);
 
-    app.event_loop().unwrap();
+    use std::panic::{self, AssertUnwindSafe};
+    let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        app.event_loop().unwrap();
+    }));
 
-    /*
+    // return screen to normal
+    drop(app);
 
-    let username: String = "".into();
-    let client = client::Client::new(connection::Connection::new("0.0.0.0", 3000));
-    // println!("username: {}", username);
-    let res = (methods::Login { username: username.clone() }).invoke(&client.connection).unwrap();
-
-    match res {
-        LoginResult::LoginOk { username } => println!("logged in as {}", username),
-        LoginResult::LoginErr => panic!("can not log in with this username!"),
+    if let Err(e) = result {
+        match e.downcast::<&str>() {
+            Ok(s) => println!("{}", *s),
+            Err(_) => println!("Unknown error"),
+        }
+        ::std::process::exit(1);
     }
-
-    let online: Online = (methods::Online {}).invoke(&client.connection).unwrap();
-
-    println!("users online:");
-    for (i, user) in match online { Online::Online { users } => users }.iter().enumerate() {
-        println!("{}. {}", i + 1, user);
-    }
-    */
 }
