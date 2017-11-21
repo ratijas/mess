@@ -1,5 +1,4 @@
 #![allow(unused_imports)]
-#![feature(specialization)]
 
 // network
 extern crate reqwest;
