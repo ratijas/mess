@@ -23,16 +23,31 @@ impl<'a> Widget for StatusBar<'a> {
     fn draw(&self, area: &Rect, buf: &mut Buffer) {
         if area.height != 2 { panic!("status bar does not fit"); }
 
-        let color = if self.message.is_empty() {
-            Color::Reset
-        } else if self.error { Color::Red } else { Color::Green };
+        if self.message.is_empty() {
+            let help = "  \
+                 {mod=invert ^O} File/Text              \
+    {mod=invert F1}-{mod=invert 3} Noise                \
+                 {mod=invert F5} Refresh                \
+                 {mod=invert ^C} Exit                   \
+                 {mod=invert Enter} Send message        ";
 
-        Paragraph::default()
-            .text(self.message)
-            .raw(true)
-            .block(Block::default()
-                .border_style(Style::default().fg(color))
-                .borders(border::LEFT | border::RIGHT | border::BOTTOM))
-            .draw(area, buf);
+            Paragraph::default()
+                .text(help)
+                .raw(false)
+                .block(Block::default()
+                    .border_style(Style::default().fg(Color::Reset))
+                    .borders(border::LEFT | border::RIGHT | border::BOTTOM))
+                .draw(area, buf);
+        } else {
+            let color = if self.error { Color::Red } else { Color::Green };
+
+            Paragraph::default()
+                .text(self.message)
+                .raw(true)
+                .block(Block::default()
+                    .border_style(Style::default().fg(color))
+                    .borders(border::LEFT | border::RIGHT | border::BOTTOM))
+                .draw(area, buf);
+        }
     }
 }
