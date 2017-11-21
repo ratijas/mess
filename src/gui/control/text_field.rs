@@ -21,6 +21,7 @@ impl TextField {
     }
 }
 
+#[allow(unused)]
 impl TextField {
     pub fn buffer(mut self, buffer: String) -> TextField {
         self.buffer = buffer;
@@ -118,14 +119,4 @@ impl Responder for TextField {
             false
         }
     }
-}
-
-fn word_start(text: &str) -> usize {
-    text.char_indices()
-        .rev()
-        .skip_while(|&(_, ch)| ch.is_whitespace())
-        .skip_while(|&(_, ch)| !ch.is_whitespace())
-        .map(|(i, _)| i)
-        .next()
-        .unwrap_or(0)
 }

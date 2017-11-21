@@ -15,14 +15,13 @@ extern crate algos;
 extern crate rand;
 
 mod app;
+mod error;
 mod imports;
 mod connection;
 mod gui;
 
 
 // std
-use std::io::{self, Write};
-use std::thread;
 
 use algos::types::*;
 use algos::methods::*;
@@ -62,6 +61,7 @@ pub enum AppEvent {
     Updates(Updates),
 }
 
+/*
 #[allow(unused)]
 impl App {
     fn new(t: Terminal<TermionBackend>) -> App {
@@ -125,19 +125,13 @@ impl App {
         });
 
         let tx_event = app.tx.clone();
-        let rx_username = app.on_username_change();
         thread::spawn(move || {
-            let host = "0.0.0.0";
-            let conn = connection::Connection::new(host, 3000);
-            // first time blocking call to receiver
-            let mut username = rx_username.recv().unwrap();
-
             loop {
-                /*
+                *//*
                 let updates = (methods::GetUpdates { username: username.clone() })
                     .invoke(&conn)
                     .unwrap();
-                */
+                *//*
                 let updates = Updates::Updates {
                     updates: vec![
                         Update::TextUpdate {
@@ -161,114 +155,15 @@ impl App {
                     ]
                 };
                 thread::sleep(::std::time::Duration::from_secs(5));
-                // TODO
-
-                // non-blocking check for changes
-                match rx_username.try_recv() {
-                    // discard updates, because they do not belong to current user anymore
-                    Ok(u) => username = u,
-                    _ => tx_event.send(AppEvent::Updates(updates)).unwrap(),
-                }
+                tx_event.send(AppEvent::Updates(updates)).unwrap()
             }
         });
 
         app
     }
 
-    pub fn event_loop(mut self) -> Result<Terminal<TermionBackend>, io::Error> {
-        loop {
-            let size = self.t.borrow().size()?;
-            if size != self.size {
-                self.t.borrow_mut().resize(size)?;
-                self.size = size;
-            }
-            // (*self.root_view).borrow().render_on_termion(&mut *self.t.borrow_mut(), &self.size);
-
-            let event = self.rx.recv().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
-
-            match event {
-                AppEvent::Input(event) => {
-                    self.handle_event(event);
-                    if self.quit { break; }
-                }
-                AppEvent::Online(users) => {
-                    match users {
-                        Online::Online { users } => {
-                            self.online = users;
-                        }
-                    }
-                }
-                AppEvent::Updates(updates) => {
-                    match updates {
-                        Updates::Updates { updates } => {
-                            self.inbox.extend(updates);
-                        }
-                    }
-                }
-            }
-        }
-        Ok(self.t.into_inner())
-    }
-
-    pub fn on_username_change(&mut self) -> Receiver<Username> {
-        let (tx, rx) = channel();
-        self.username_listeners.push(tx);
-        rx
-    }
-
-    pub fn username(&mut self, username: Username) {
-        self.username = Some(username);
-        for tx in self.username_listeners.iter() {
-            tx.send(self.username.as_ref().unwrap().clone()).unwrap();
-        }
-    }
-
     pub fn handle_event(&mut self, event: Event) {
-        /*
-        let mut controller: Boxed<ViewController> = (*self.root_view).borrow().active_child_view_controller().upgrade().unwrap();
-        // bubble down
-        loop {
-            if (*controller).borrow_mut().handle_event(event.clone(), true) {
-                return;
-            }
-            let child = (*controller).borrow().active_child_view_controller();
-            if let Some(child) = child.upgrade() {
-                controller = child;
-            } else {
-                break;
-            }
-        }
-        // bubble up
-        loop {
-            if (*controller).borrow_mut().handle_event(event.clone(), false) {
-                return;
-            }
-            let parent = (*controller).borrow().parent_view_controller();
-            if let Some(parent) = parent.upgrade() {
-                controller = parent;
-            } else {
-                break;
-            }
-        }
-        */
-
-        match event {
-            Event::Key(Key::Esc) => self.quit = true,
-            _ => {}
-        }
-
-        /*
-            Key::Ctrl('l') => {
-                self.size = self.t.borrow().size()?;
-                self.t.borrow_mut().resize(self.size)?;
-                self.t.borrow_mut().clear()?;
-            }
-            Key::Backspace => {
-                self.status.pop();
-            }
-            Key::Char(ch) => {
-                self.status.push(ch);
-            }
+        *//*
             k @ Key::Up | k @ Key::Down => {
                 let new_index = match self.peer {
                     Some(ref peer) => {
@@ -286,11 +181,8 @@ impl App {
                 };
                 self.peer = self.online.get(new_index).cloned();
             }
-            key => {
-                self.status = format!("key: {:?}", key);
-            }
         }
-        */
+        *//*
     }
 
     fn draw(&mut self) -> Result<(), io::Error> {
@@ -323,6 +215,7 @@ impl App {
         Ok(())
     }
 }
+*/
 
 fn usage() -> ! {
     let name = env::args().next().unwrap();
@@ -334,11 +227,11 @@ fn main() {
     let mut args = env::args().skip(1);
     let me = match args.next() {
         Some(ok) => ok,
-        None => usage()
+        None => usage(),
     };
     let peer = match args.next() {
         Some(ok) => ok,
-        None => usage()
+        None => usage(),
     };
 
     let mut app = app::App::new(me, peer);

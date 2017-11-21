@@ -18,7 +18,7 @@ pub enum AppEvent {
 
     SentText(SendText),
     SentFile(UploadFile),
-    SendFailed,
+    SendFailed { reason: String },
 
     Log { message: String, error: bool },
 }
@@ -34,6 +34,8 @@ pub struct App {
     // users
     me: Username,
     peer: Username,
+    /// oldest messages come first
+    history: Vec<Update>,
 
     // app internals
     events: (Sender<AppEvent>, Receiver<AppEvent>),
@@ -60,6 +62,7 @@ impl App {
 
             me,
             peer,
+            history: Vec::new(),
 
             events: channel(),
 
@@ -108,7 +111,7 @@ impl App {
         }
     }
 
-    pub fn event_loop(&mut self) -> io::Result<()> {
+    pub fn event_loop(&mut self) -> Result<()> {
         self.set_up();
         self.login();
 
@@ -122,7 +125,7 @@ impl App {
             }
 
             let event = self.events.1.recv().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
-            self.handle_app_event(event);
+            self.handle_app_event(event)?;
         }
 
         Ok(())
@@ -139,21 +142,19 @@ impl App {
         Ok(())
     }
 
-    fn draw(&self, t: &mut Terminal<TermionBackend>) -> io::Result<()> {
+    fn draw(&self, t: &mut Terminal<TermionBackend>) -> Result<()> {
         Group::default()
             .direction(Direction::Vertical)
             .margin(0)
             .sizes(&[Size::Min(0), Size::Fixed(2), Size::Fixed(2)]) // status bar at the bottom
             .render(t, &self.size, |t, chunks| {
-                Block::default()
-                    .borders(border::ALL)
+                Paragraph::default()
+                    .text(&format_updates(&self.history))
+                    .raw(false)
+                    .wrap(true)
+                    .block(Block::default()
+                        .borders(border::ALL))
                     .render(t, &chunks[0]);
-
-                //                Group::default()
-                //                    .direction(Direction::Vertical)
-                //                    .margin(1)
-                //                    .sizes(&[Size::Min(0), Size::Fixed(1), Size::Fixed(2)])
-                //                    .render(t, &chunks[0], |t, chunks| {});
 
                 LineEdit::default()
                     .label("Text")
@@ -171,9 +172,9 @@ impl App {
         Ok(())
     }
 
-    fn handle_app_event(&mut self, event: AppEvent) {
+    fn handle_app_event(&mut self, event: AppEvent) -> Result<()> {
         match event {
-            AppEvent::Input(ev) => self.handle_input(ev),
+            AppEvent::Input(ev) => self.handle_input(ev)?,
             AppEvent::Log { message, error } => {
                 if error {
                     self.state = State::Error;
@@ -183,19 +184,26 @@ impl App {
                 self.status = message;
             }
             AppEvent::SentText(msg) => {
-                //self.messages.push(msg);
+                self.history.push(Update::TextUpdate {
+                    from: msg.from,
+                    to: msg.to,
+                    payload: msg.payload,
+                });
 
                 self.input.reset();
                 self.sending = false;
             }
-            AppEvent::SendFailed => {
+            AppEvent::SendFailed { reason } => {
                 self.sending = false;
+                self.state = State::Error;
+                self.status = reason;
             }
             _ => {}
         }
+        Ok(())
     }
 
-    fn handle_input(&mut self, event: Event) {
+    fn handle_input(&mut self, event: Event) -> Result<()> {
         match event {
             Event::Key(Key::Esc) => {
                 if !self.status.is_empty() {
@@ -205,7 +213,7 @@ impl App {
                 }
             }
             Event::Key(Key::Char('\n')) => {
-                self.send();
+                self.send()?;
             }
             Event::Key(Key::Ctrl('l')) => { /* redraw */ }
             event => {
@@ -214,16 +222,15 @@ impl App {
                 }
             }
         }
+        Ok(())
     }
 
-    fn send(&mut self) {
+    fn send(&mut self) -> Result<()> {
         self.sending = true;
 
         if self.input.buffer.len() == 0 {
-            self.sending = false;
-            self.events.0.send(AppEvent::SendFailed).unwrap();
-            error(&self.events.0, "Message is empty");
-            return;
+            self.events.0.send(AppEvent::SendFailed { reason: "Message is empty".into() })?;
+            return Ok(());
         }
 
         let content = self.input.buffer.clone();
@@ -231,7 +238,9 @@ impl App {
         let peer = self.peer.clone();
 
         let tx = self.events.0.clone();
-        tx.send(AppEvent::Log { message: "sending message".into(), error: false }).unwrap();
+
+        info(&tx, "Send message: compressing...");
+
         thread::spawn(move || {
             thread::sleep(::std::time::Duration::from_millis(500));
             let method = SendText {
@@ -243,6 +252,7 @@ impl App {
                     Coding::Hamming,
                 ).unwrap(),
             };
+
             info(&tx, "Send message: compressed and encoded");
 
             let result = method.invoke(&Connection::default());
@@ -251,20 +261,76 @@ impl App {
             match result {
                 Ok(answer) => {
                     if answer == false {
-                        error(&tx, "Send message: server error");
-                        tx.send(AppEvent::SendFailed).unwrap();
+                        tx.send(AppEvent::SendFailed { reason: "Send message: server error".into() }).unwrap();
                     } else {
                         info(&tx, "Send message: done");
                         tx.send(AppEvent::SentText(method)).unwrap();
                     }
                 }
                 Err(e) => {
-                    error(&tx, format!("Send message: Error: {:?}", e));
-                    tx.send(AppEvent::SendFailed).unwrap();
+                    tx.send(AppEvent::SendFailed { reason: format!("Send message: Error: {:?}", e) }).unwrap();
                 }
             }
         });
+        Ok(())
     }
+}
+
+fn format_updates(updates: &[Update]) -> String {
+    let mut s = String::new();
+
+    for update in updates {
+        match *update {
+            Update::TextUpdate { ref from, ref to, ref payload } => {
+                s.push_str(&format!("[{} to {}]: ", colorize_username(from), colorize_username(to)));
+
+                let msg = match payload.clone().into_bytes() {
+                    Ok(vec) => match String::from_utf8(vec) {
+                        Ok(s) => escape_brackets(s),
+                        Err(_) => "{red UTF-8 error}".into(),
+                    },
+                    Err(_) => "{red decoding error}".into(),
+                };
+                s.push_str(&msg);
+                s.push_str("\n");
+            }
+            _ => {}
+        }
+    }
+
+    s
+}
+
+fn escape_brackets(s: String) -> String {
+    s.replace("\\", "\\\\").replace("{", "\\{")
+}
+
+fn color_for_name(name: &str) -> &'static str {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut h = DefaultHasher::new();
+    name.hash(&mut h);
+    let hash = h.finish();
+
+    const COLORS: &[&str] = &[
+        "red",
+        "green",
+        "yellow",
+        "magenta",
+        "cyan",
+        "light_red",
+        "light_green",
+        "light_yellow",
+        "light_magenta",
+        "light_cyan",
+    ];
+    COLORS[(2 + hash) as usize % COLORS.len()]
+}
+
+fn colorize_username(s: &Username) -> String {
+    let color = color_for_name(s);
+    format!("{{fg={} {}}}", color, s)
 }
 
 fn info<I: Into<String>>(tx: &Sender<AppEvent>, message: I) {
@@ -272,6 +338,7 @@ fn info<I: Into<String>>(tx: &Sender<AppEvent>, message: I) {
     tx.send(AppEvent::Log { message, error: false }).unwrap();
 }
 
+#[allow(unused)]
 fn error<I: Into<String>>(tx: &Sender<AppEvent>, message: I) {
     let message = message.into();
     tx.send(AppEvent::Log { message, error: true }).unwrap();
