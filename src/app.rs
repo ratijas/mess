@@ -124,7 +124,7 @@ impl App {
                 // drop t
             }
 
-            let event = self.events.1.recv().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+            let event = self.events.1.recv()?;
             self.handle_app_event(event)?;
         }
 
@@ -314,18 +314,13 @@ fn color_for_name(name: &str) -> &'static str {
     let hash = h.finish();
 
     const COLORS: &[&str] = &[
-        "red",
-        "green",
         "yellow",
         "magenta",
         "cyan",
         "light_red",
-        "light_green",
-        "light_yellow",
         "light_magenta",
-        "light_cyan",
     ];
-    COLORS[(2 + hash) as usize % COLORS.len()]
+    COLORS[(1 + hash) as usize % COLORS.len()]
 }
 
 fn colorize_username(s: &Username) -> String {

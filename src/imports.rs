@@ -3,7 +3,7 @@ pub use std::env;
 
 pub use std::cell::RefCell;
 pub use std::sync::{Arc, Weak};
-pub use std::sync::mpsc::{channel, Sender, Receiver, SendError};
+pub use std::sync::mpsc::{channel, Sender, Receiver};
 
 pub use std::thread;
 
