@@ -10,7 +10,7 @@ pub struct DownloadFile {
 }
 
 impl Method for DownloadFile {
-    type Answer = types::Data;
+    type Answer = types::DownloadedFile;
 
     fn endpoint() -> &'static str {
         "downloadFile"

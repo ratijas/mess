@@ -28,6 +28,10 @@
 //! - `FileId`
 //!     * `FileId file_id:int = FileId`
 //!
+//! - `DownloadedFile`
+//!     * `File data:Data = DownloadedFile`
+//!     * `EmptyFile = DownloadedFile`
+//!
 //! - `Data`
 //!     * `Data coding:Coding compression:Compression length:int bytes:bytes = Data`, where `length` is # bits.
 //!
@@ -53,6 +57,7 @@ pub mod file_id;
 pub mod data;
 pub mod coding;
 pub mod compression;
+pub mod downloaded_file;
 
 pub use self::login_result::LoginResult;
 pub use self::online::Online;
@@ -63,6 +68,7 @@ pub use self::file_id::FileId;
 pub use self::data::Data;
 pub use self::coding::Coding;
 pub use self::compression::Compression;
+pub use self::downloaded_file::DownloadedFile;
 
 pub type Username = String;
 

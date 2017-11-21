@@ -5,7 +5,7 @@
 //! - `sendFile = FileId`
 //! - `sendText from:Username to:Username payload:Data = Bool`
 //! - `uploadFile from:Username to:Username meta:FileMeta file_id:FileId payload:Data = Bool`
-//! - `downloadFile file_id:FileId = Data`
+//! - `downloadFile file_id:FileId = DownloadedFile`
 
 use std::str;
 use std::io::{self, Read};
@@ -51,6 +51,7 @@ pub trait ClientMethod: Method {
 }
 
 
+#[derive(Debug)]
 pub enum ClientError {
     ReqwestError(reqwest::Error),
     IoError(io::Error),
