@@ -2,6 +2,7 @@ use imports::*;
 
 pub struct LineEdit<'a> {
     label: &'a str,
+    placeholder: &'a str,
     text: &'a str,
     /// byte cursor
     cursor: usize,
@@ -13,6 +14,7 @@ impl<'a> Default for LineEdit<'a> {
     fn default() -> Self {
         LineEdit {
             label: "",
+            placeholder: "",
             text: "",
             cursor: 0,
             focus: false,
@@ -24,6 +26,10 @@ impl<'a> Default for LineEdit<'a> {
 impl<'a> LineEdit<'a> {
     pub fn label(mut self, label: &'a str) -> LineEdit<'a> {
         self.label = label;
+        self
+    }
+    pub fn placeholder(mut self, placeholder: &'a str) -> LineEdit<'a> {
+        self.placeholder = placeholder;
         self
     }
     pub fn text(mut self, text: &'a str) -> LineEdit<'a> {
@@ -69,14 +75,26 @@ impl<'a> Widget for LineEdit<'a> {
         text_area.x += label_width + padding;
         text_area.width -= label_width + padding;
 
-        Paragraph::default()
-            .text(self.text)
-            .wrap(false)
-            .raw(true)
-            .block(Block::default()
-                .border_style(Style::default().fg(color))
-                .borders(border::RIGHT | border::BOTTOM))
-            .draw(&text_area, buf);
+        if self.text.is_empty() {
+            Paragraph::default()
+                .text(self.placeholder)
+                .style(Style::default().fg(Color::Gray))
+                .wrap(false)
+                .raw(true)
+                .block(Block::default()
+                    .border_style(Style::default().fg(color))
+                    .borders(border::RIGHT | border::BOTTOM))
+                .draw(&text_area, buf);
+        } else {
+            Paragraph::default()
+                .text(self.text)
+                .wrap(false)
+                .raw(true)
+                .block(Block::default()
+                    .border_style(Style::default().fg(color))
+                    .borders(border::RIGHT | border::BOTTOM))
+                .draw(&text_area, buf);
+        }
 
         if self.focus {
             let cursor = self.text[..self.cursor].chars().count();

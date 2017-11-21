@@ -41,6 +41,13 @@ impl Mode {
         }
     }
 
+    pub fn placeholder(self) -> &'static str {
+        match self {
+            Mode::Text => "Write a message...",
+            Mode::File => "Choose a [path to a] file...",
+        }
+    }
+
     fn strip_file_uri(path: &str) -> &str {
         if path.starts_with("file://") {
             &path["file://".len()..]

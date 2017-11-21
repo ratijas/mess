@@ -201,6 +201,7 @@ impl App {
                 LineEdit::default()
                     .label(self.mode.name())
                     .text(&self.input.buffer)
+                    .placeholder(self.mode.placeholder())
                     .cursor(self.input.cursor)
                     .focus(!self.sending)
                     .focus_color(self.mode.focus_color(&self.input.buffer))
