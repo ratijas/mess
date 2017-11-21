@@ -172,14 +172,28 @@ impl App {
             .margin(0)
             .sizes(&[Size::Min(0), Size::Fixed(2), Size::Fixed(2)]) // status bar at the bottom
             .render(t, &self.size, |t, chunks| {
-                Paragraph::default()
-                    .text(&format_updates(&self.history))
-                    .raw(false)
-                    .wrap(true)
-                    .block(Block::default()
-                        .borders(border::ALL))
-                    .render(t, &chunks[0]);
-
+                if self.history.is_empty() {
+                    // logo
+                    let logo = ::logo::logo_for_size(chunks[0]);
+                    Paragraph::default()
+                        .text(&logo)
+                        .style(Style::default()
+                            .fg(Color::LightMagenta)
+                            .modifier(Modifier::Bold))
+                        .raw(true)
+                        .wrap(false)
+                        .block(Block::default()
+                            .borders(border::ALL))
+                        .render(t, &chunks[0]);
+                } else {
+                    Paragraph::default()
+                        .text(&format_updates(&self.history))
+                        .raw(false)
+                        .wrap(true)
+                        .block(Block::default()
+                            .borders(border::ALL))
+                        .render(t, &chunks[0]);
+                }
                 LineEdit::default()
                     .label("Text")
                     .text(&self.input.buffer)

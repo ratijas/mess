@@ -19,6 +19,7 @@ mod error;
 mod imports;
 mod connection;
 mod gui;
+mod logo;
 
 
 // std
