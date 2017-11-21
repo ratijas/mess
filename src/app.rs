@@ -83,7 +83,10 @@ impl App {
             let stdin = io::stdin();
             for event in stdin.events() {
                 let event = event.unwrap();
-                tx.send(AppEvent::Input(event)).unwrap();
+                match tx.send(AppEvent::Input(event)) {
+                    Ok(()) => {}
+                    Err(_) => break,
+                }
             }
         });
     }
@@ -111,9 +114,30 @@ impl App {
         }
     }
 
+    fn spawn_updates_loop(&self) {
+        let tx = self.events.0.clone();
+        let me = self.me.clone();
+        thread::spawn(move || {
+            loop {
+                let method = GetUpdates { username: me.clone() };
+                let answer = method.invoke(&Connection::default());
+                let event = match answer {
+                    Ok(updates) => AppEvent::Updates(updates),
+                    Err(e) => AppEvent::Log { error: true, message: format!("GetUpdates error: {:?}", e) },
+                };
+                match tx.send(event) {
+                    Ok(()) => {}
+                    Err(_) => break,
+                }
+                thread::sleep(::std::time::Duration::from_millis(500));
+            }
+        });
+    }
+
     pub fn event_loop(&mut self) -> Result<()> {
         self.set_up();
         self.login();
+        self.spawn_updates_loop();
 
         while self.state != State::Exit {
             self.resize_maybe()?;
@@ -197,6 +221,10 @@ impl App {
                 self.sending = false;
                 self.state = State::Error;
                 self.status = reason;
+            }
+            AppEvent::Updates(updates) => {
+                let Updates::Updates { updates } = updates;
+                self.history.extend(updates);
             }
             _ => {}
         }
