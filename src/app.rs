@@ -247,18 +247,12 @@ impl App {
 
     fn handle_input(&mut self, event: Event) -> Result<()> {
         match event {
-            Event::Key(Key::Esc) => {
-                if !self.status.is_empty() {
-                    self.status.clear();
-                } else {
-                    self.state = State::Exit;
-                }
-            }
-            Event::Key(Key::Char('\n')) => {
-                self.send()?;
-            }
+            Event::Key(Key::Esc) => self.status.clear(),
+            Event::Key(Key::Ctrl('c')) => self.state = State::Exit,
+            Event::Key(Key::F(5)) => self.history.clear(),
+            Event::Key(Key::Char('\n')) => self.send()?,
             Event::Key(Key::Ctrl('l')) => { /* redraw */ }
-            event => {
+            _ => {
                 if !self.sending {
                     self.input.handle_event(event);
                 }
