@@ -2,6 +2,7 @@ pub use std::io::{self, Read, Write};
 pub use std::env;
 
 pub use std::fs::{self, File};
+pub use std::path::{Path, PathBuf};
 
 pub use std::cell::RefCell;
 pub use std::sync::{Arc, Weak};

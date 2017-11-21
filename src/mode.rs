@@ -24,16 +24,16 @@ impl Mode {
         }
     }
 
-    pub fn focus_color(self, app: &::app::App) -> Color {
+    pub fn focus_color(self, input: &String) -> Color {
         match self {
             Mode::Text => Color::Cyan,
             Mode::File => {
-                if app.input.buffer.is_empty() {
+                if input.is_empty() {
                     Color::Yellow
                 } else {
-                    match fs::metadata(Mode::strip_file_uri(&app.input.buffer))
-                        .map(|meta| meta.is_file()) {
-                        Ok(true) => Color::Green,
+                    let path = Mode::strip_file_uri(input);
+                    match File::open(path) {
+                        Ok(_) => Color::Green,
                         _ => Color::LightRed,
                     }
                 }
@@ -50,18 +50,17 @@ impl Mode {
     }
 
     /// For Text mode: return the input.
-    /// For File mode: return file content.
-    pub fn data_for_input(self, input: &String) -> Result<Vec<u8>> {
+    /// For File mode: return stripped file name.
+    pub fn preprocess(self, input: &String) -> Result<String> {
         if input.is_empty() {
             Err("Message is empty")?
         } else {
             match self {
-                Mode::Text => Ok(input.clone().into_bytes()),
+                Mode::Text => Ok(input.clone()),
                 Mode::File => {
-                    let mut content = Vec::new();
-                    File::open(Mode::strip_file_uri(input))?
-                        .read_to_end(&mut content)?;
-                    Ok(content)
+                    let path = Mode::strip_file_uri(input);
+                    File::open(path)?;
+                    Ok(path.to_string())
                 }
             }
         }

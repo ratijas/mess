@@ -18,7 +18,7 @@ pub enum AppEvent {
 
     SentText(SendText),
     SentFile(UploadFile),
-    SendFailed { reason: String },
+    SendFailed { error: Error },
 
     Log { message: String, error: bool },
 }
@@ -75,9 +75,12 @@ impl App {
         }
     }
 
-    pub fn error(&mut self, msg: String) {
+    pub fn error(&mut self, error: Error) {
         self.state = State::Error;
-        self.status = msg;
+        self.status = match error {
+            Error::Reason(reason) => reason,
+            _ => format!("{:?}", error),
+        };
     }
 
     fn set_up(&mut self) {
@@ -106,14 +109,12 @@ impl App {
                     }
                     LoginResult::LoginErr => {
                         let msg = format!("Login error: username \"{}\" can not be used", &self.me);
-                        self.error(msg);
+                        self.error(msg.into());
                         self.me.clear();
                     }
                 }
             }
-            Err(e) => {
-                self.error(format!("{:?}", e));
-            }
+            Err(e) => self.error(e.into()),
         }
     }
 
@@ -202,7 +203,7 @@ impl App {
                     .text(&self.input.buffer)
                     .cursor(self.input.cursor)
                     .focus(!self.sending)
-                    .focus_color(self.mode.focus_color(&self))
+                    .focus_color(self.mode.focus_color(&self.input.buffer))
                     .render(t, &chunks[1]);
 
                 StatusBar::default()
@@ -220,12 +221,10 @@ impl App {
         for update in self.history.iter() {
             match *update {
                 Update::TextUpdate { ref from, ref to, ref payload } => {
-                    let direction = if *from == self.me { ">" } else { "<" };
-                    s.push_str(&format!("{}[{} to {}]: ", direction, colorize_username(from), colorize_username(to)));
-
+                    s.push_str(&self.format_meta(from, to));
                     let msg = match payload.clone().into_bytes() {
                         Ok(vec) => match String::from_utf8(vec) {
-                            Ok(s) => escape_brackets(s),
+                            Ok(s) => escape_brackets(&s),
                             Err(_) => "{red UTF-8 error}".into(),
                         },
                         Err(_) => "{red decoding error}".into(),
@@ -233,11 +232,22 @@ impl App {
                     s.push_str(&msg);
                     s.push_str("\n");
                 }
-                _ => {}
+                Update::FileUpdate { ref from, ref to, ref meta, .. } => {
+                    s.push_str(&self.format_meta(from, to));
+
+                    let &FileMeta::FileMeta { ref name, size, .. } = meta;
+                    s.push_str(&format!("[File {{fg=red \"{}\"}} {} bytes]\n",
+                                        escape_brackets(name), size))
+                }
             }
         }
 
         s
+    }
+
+    fn format_meta(&self, from: &str, to: &str) -> String {
+        let direction = if *from == self.me { ">" } else { "<" };
+        format!("{}[{} to {}]: ", direction, colorize_username(from), colorize_username(to))
     }
 
     fn handle_app_event(&mut self, event: AppEvent) -> Result<()> {
@@ -260,15 +270,37 @@ impl App {
 
                 self.input.reset();
                 self.sending = false;
+                self.status = format!("Send text: done");
             }
-            AppEvent::SendFailed { reason } => {
+            AppEvent::SentFile(file) => {
+                self.history.push(Update::FileUpdate {
+                    from: file.from,
+                    to: file.to,
+                    meta: file.meta,
+                    file_id: file.file_id,
+                });
+                self.input.reset();
                 self.sending = false;
-                self.state = State::Error;
-                self.status = reason;
+                self.status = format!("Send file: done");
+            }
+            AppEvent::SendFailed { error } => {
+                self.sending = false;
+                self.error(error);
             }
             AppEvent::Updates(updates) => {
                 let Updates::Updates { updates } = updates;
-                self.history.extend(updates);
+                for update in updates {
+                    if let &Update::FileUpdate { ref meta, ref file_id, .. } = &update {
+                        match self.download_file(meta, file_id) {
+                            Ok(_) => {
+                                self.status = format!("Download file: done");
+                                self.state = State::LoggedIn;
+                            }
+                            Err(e) => self.error(e),
+                        }
+                    }
+                    self.history.push(update);
+                }
             }
             _ => {}
         }
@@ -295,10 +327,10 @@ impl App {
     fn send(&mut self) -> Result<()> {
         self.sending = true;
 
-        let content = match self.mode.data_for_input(&self.input.buffer) {
-            Ok(content) => content,
+        let input = match self.mode.preprocess(&self.input.buffer) {
+            Ok(input) => input,
             Err(e) => {
-                self.events.0.send(AppEvent::SendFailed { reason: format!("{:?}", e) })?;
+                self.events.0.send(AppEvent::SendFailed { error: e })?;
                 return Ok(());
             }
         };
@@ -307,39 +339,53 @@ impl App {
 
         let tx = self.events.0.clone();
 
-        info(&tx, "Send message: compressing...");
+        match self.mode {
+            Mode::Text => {
+                thread::spawn(move || {
+                    info(&tx, "Send message: compressing...");
+                    thread::sleep(::std::time::Duration::from_millis(500));
 
-        thread::spawn(move || {
-            thread::sleep(::std::time::Duration::from_millis(500));
-            let method = SendText {
-                from: me,
-                to: peer,
-                payload: Data::from_bytes(
-                    content.as_slice(),
-                    Compression::Rle,
-                    Coding::Hamming,
-                ).unwrap(),
-            };
+                    let method = SendText {
+                        from: me,
+                        to: peer,
+                        payload: Data::from_bytes(
+                            input.as_bytes(),
+                            Compression::Rle,
+                            Coding::Hamming,
+                        ).unwrap(),
+                    };
 
-            info(&tx, "Send message: compressed and encoded");
+                    info(&tx, "Send message: compressed and encoded; sending...");
 
-            let result = method.invoke(&Connection::default());
-            thread::sleep(::std::time::Duration::from_millis(500));
+                    let result = method.invoke(&Connection::default());
+                    thread::sleep(::std::time::Duration::from_millis(500));
 
-            match result {
-                Ok(answer) => {
-                    if answer == false {
-                        tx.send(AppEvent::SendFailed { reason: "Send message: server error".into() }).unwrap();
-                    } else {
-                        info(&tx, "Send message: done");
-                        tx.send(AppEvent::SentText(method)).unwrap();
+                    match result {
+                        Ok(answer) => {
+                            if answer == false {
+                                tx.send(AppEvent::SendFailed { error: "server error".into() }).unwrap();
+                            } else {
+                                info(&tx, "Send message: done");
+                                tx.send(AppEvent::SentText(method)).unwrap();
+                            }
+                        }
+                        Err(e) => {
+                            tx.send(AppEvent::SendFailed { error: e.into() }).unwrap();
+                        }
                     }
-                }
-                Err(e) => {
-                    tx.send(AppEvent::SendFailed { reason: format!("Send message: Error: {:?}", e) }).unwrap();
-                }
+                });
             }
-        });
+            Mode::File => {
+                thread::spawn(move || {
+                    info(&tx, "Sending file...");
+                    let event = match send_file(me, peer, input) {
+                        Ok(file) => AppEvent::SentFile(file),
+                        Err(e) => AppEvent::SendFailed { error: e },
+                    };
+                    tx.send(event).unwrap();
+                });
+            }
+        }
         Ok(())
     }
 
@@ -350,9 +396,39 @@ impl App {
         };
         self.mode = mode;
     }
+
+    fn download_file(&self, meta: &FileMeta, file_id: &FileId) -> Result<()> {
+        let &FileMeta::FileMeta { ref name, size, .. } = meta;
+        // create downloads directory
+        let downloads = Path::new("Downloads");
+        fs::create_dir_all(downloads)?;
+
+        let method = DownloadFile { file_id: file_id.clone() };
+        let answer = method.invoke(&Connection::default())?;
+        match answer {
+            DownloadedFile::EmptyFile {} => Err("No such file on server")?,
+            DownloadedFile::File { data } => {
+                let bytes = data.into_bytes()?;
+
+                if bytes.len() != size as usize {
+                    Err("Decoded file size mismatch")?;
+                }
+
+                let mut path = PathBuf::new();
+                path.push(downloads);
+                path.push(name);
+
+
+                let mut file = fs::OpenOptions::new().create(true).write(true).open(path)?;
+                file.write_all(&bytes)?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
-fn escape_brackets(s: String) -> String {
+fn escape_brackets(s: &str) -> String {
     s.replace("\\", "\\\\").replace("{", "\\{")
 }
 
@@ -374,7 +450,7 @@ fn color_for_name(name: &str) -> &'static str {
     COLORS[(1 + hash) as usize % COLORS.len()]
 }
 
-fn colorize_username(s: &Username) -> String {
+fn colorize_username(s: &str) -> String {
     let color = color_for_name(s);
     format!("{{fg={} {}}}", color, s)
 }
@@ -397,4 +473,40 @@ impl Drop for App {
         t.show_cursor().unwrap();
         t.clear().unwrap();
     }
+}
+
+fn send_file<P: AsRef<Path>>(me: Username, peer: Username, path: P) -> Result<UploadFile> {
+    thread::sleep(::std::time::Duration::from_millis(500));
+
+    let conn = Connection::default();
+
+    let file_id = SendFile {}.invoke(&conn)?;
+
+    let path: &Path = path.as_ref();
+    let mut file = File::open(path)?;
+    let mut content = Vec::new();
+    file.read_to_end(&mut content)?;
+
+    let meta = FileMeta::FileMeta {
+        name: path.file_name().and_then(|s| s.to_str()).ok_or("File name error")?.to_string(),
+        size: content.len() as i64,
+        mime: String::new(),
+        // TODO
+    };
+
+    let method = UploadFile {
+        from: me,
+        to: peer,
+        meta,
+        file_id,
+        payload: Data::from_bytes(
+            &content,
+            Compression::Rle,
+            Coding::Hamming,
+        ).unwrap(),
+    };
+
+    let answer = method.invoke(&conn)?;
+    if answer == false { Err("Send file: server error")?; }
+    Ok(method)
 }
