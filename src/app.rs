@@ -1,6 +1,8 @@
 use imports::*;
 use algos::methods::ClientMethod;
-use std::cell::RefCell;
+
+use mime_guess;
+
 
 #[derive(Eq, PartialEq)]
 pub enum State {
@@ -10,10 +12,9 @@ pub enum State {
     Exit,
 }
 
-#[allow(unused)]
 pub enum AppEvent {
     Input(Event),
-    Online(Online),
+    // Online(Online),
     Updates(Updates),
 
     SentText(SendText),
@@ -38,6 +39,8 @@ pub struct App {
     peer: Username,
     /// oldest messages come first
     history: Vec<Update>,
+
+    noise: NoiseLevel,
 
     // app internals
     events: (Sender<AppEvent>, Receiver<AppEvent>),
@@ -66,6 +69,8 @@ impl App {
             me,
             peer,
             history: Vec::new(),
+
+            noise: NoiseLevel::Noise015,
 
             events: channel(),
 
@@ -236,9 +241,9 @@ impl App {
                 Update::FileUpdate { ref from, ref to, ref meta, .. } => {
                     s.push_str(&self.format_meta(from, to));
 
-                    let &FileMeta::FileMeta { ref name, size, .. } = meta;
-                    s.push_str(&format!("[File {{fg=red \"{}\"}} {} bytes]\n",
-                                        escape_brackets(name), size))
+                    let &FileMeta::FileMeta { ref name, size, ref mime } = meta;
+                    s.push_str(&format!("[{} {{fg=red \"{}\"}} {} bytes]\n",
+                                        mime, escape_brackets(name), size))
                 }
             }
         }
@@ -303,7 +308,6 @@ impl App {
                     self.history.push(update);
                 }
             }
-            _ => {}
         }
         Ok(())
     }
@@ -314,6 +318,11 @@ impl App {
             Event::Key(Key::Ctrl('c')) => self.state = State::Exit,
             Event::Key(Key::Ctrl('l')) => { /* redraw */ }
             Event::Key(Key::Ctrl('o')) => self.switch_mode(),
+
+            Event::Key(Key::F(f)) if f >= 1 && f <= 3 => {
+                self.adjust_noise(f);
+            }
+
             Event::Key(Key::F(5)) => self.history.clear(),
             Event::Key(Key::Char('\n')) => self.send()?,
             _ => {
@@ -323,6 +332,15 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    fn adjust_noise(&mut self, level: u8) {
+        self.noise = match level {
+            1 => NoiseLevel::Noise001,
+            2 => NoiseLevel::Noise005,
+            _ => NoiseLevel::Noise015
+        };
+        info(&self.events.0, format!("Noise level: {}", self.noise.to_str()));
     }
 
     fn send(&mut self) -> Result<()> {
@@ -342,24 +360,33 @@ impl App {
 
         match self.mode {
             Mode::Text => {
+                let noise = self.noise;
                 thread::spawn(move || {
                     info(&tx, "Send message: compressing...");
                     thread::sleep(::std::time::Duration::from_millis(500));
 
+                    let data = Data::from_bytes(
+                        input.as_bytes(),
+                        Compression::Rle,
+                        Coding::Hamming,
+                    ).unwrap();
+
+                    let Data::Data { coding, compression, length, bytes } = data;
+                    let bits = BitVec::from_bytes(&bytes);
+                    let bits = noise.apply(bits.iter()).collect::<BitVec>();
+                    let bytes = bits.to_bytes();
+                    let data = Data::Data { coding, compression, length, bytes };
+
                     let method = SendText {
                         from: me,
                         to: peer,
-                        payload: Data::from_bytes(
-                            input.as_bytes(),
-                            Compression::Rle,
-                            Coding::Hamming,
-                        ).unwrap(),
+                        payload: data,
                     };
 
                     info(&tx, "Send message: compressed and encoded; sending...");
 
                     let result = method.invoke(&Connection::default());
-                    thread::sleep(::std::time::Duration::from_millis(500));
+                    thread::sleep(Duration::from_millis(500));
 
                     match result {
                         Ok(answer) => {
@@ -377,9 +404,10 @@ impl App {
                 });
             }
             Mode::File => {
+                let noise = self.noise;
                 thread::spawn(move || {
                     info(&tx, "Sending file...");
-                    let event = match send_file(me, peer, input) {
+                    let event = match send_file(me, peer, input, noise) {
                         Ok(file) => AppEvent::SentFile(file),
                         Err(e) => AppEvent::SendFailed { error: e },
                     };
@@ -461,12 +489,6 @@ fn info<I: Into<String>>(tx: &Sender<AppEvent>, message: I) {
     tx.send(AppEvent::Log { message, error: false }).unwrap();
 }
 
-#[allow(unused)]
-fn error<I: Into<String>>(tx: &Sender<AppEvent>, message: I) {
-    let message = message.into();
-    tx.send(AppEvent::Log { message, error: true }).unwrap();
-}
-
 impl Drop for App {
     fn drop(&mut self) {
         let t = &mut *self.t.borrow_mut();
@@ -476,8 +498,8 @@ impl Drop for App {
     }
 }
 
-fn send_file<P: AsRef<Path>>(me: Username, peer: Username, path: P) -> Result<UploadFile> {
-    thread::sleep(::std::time::Duration::from_millis(500));
+fn send_file<P: AsRef<Path>>(me: Username, peer: Username, path: P, noise: NoiseLevel) -> Result<UploadFile> {
+    thread::sleep(Duration::from_millis(500));
 
     let conn = Connection::default();
 
@@ -488,23 +510,32 @@ fn send_file<P: AsRef<Path>>(me: Username, peer: Username, path: P) -> Result<Up
     let mut content = Vec::new();
     file.read_to_end(&mut content)?;
 
+    let name = path.file_name().and_then(|s| s.to_str()).ok_or("File name error")?.to_string();
+    let mime = format!("{}", mime_guess::guess_mime_type(&name));
     let meta = FileMeta::FileMeta {
-        name: path.file_name().and_then(|s| s.to_str()).ok_or("File name error")?.to_string(),
+        name,
         size: content.len() as i64,
-        mime: String::new(),
-        // TODO
+        mime,
     };
+
+    let data = Data::from_bytes(
+        &content,
+        Compression::Rle,
+        Coding::Hamming,
+    ).unwrap();
+
+    let Data::Data { coding, compression, length, bytes } = data;
+    let bits = BitVec::from_bytes(&bytes);
+    let bits = noise.apply(bits.iter()).collect::<BitVec>();
+    let bytes = bits.to_bytes();
+    let data = Data::Data { coding, compression, length, bytes };
 
     let method = UploadFile {
         from: me,
         to: peer,
         meta,
         file_id,
-        payload: Data::from_bytes(
-            &content,
-            Compression::Rle,
-            Coding::Hamming,
-        ).unwrap(),
+        payload: data,
     };
 
     let answer = method.invoke(&conn)?;

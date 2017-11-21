@@ -18,7 +18,7 @@ impl Connection {
         Connection {
             host,
             port,
-            client: reqwest::Client::new(),
+            client: reqwest::ClientBuilder::new().timeout(Duration::from_secs(5)).build().unwrap(),
         }
     }
 

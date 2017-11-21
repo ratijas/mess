@@ -4,12 +4,14 @@ extern crate reqwest;
 extern crate serde;
 extern crate serde_json;
 extern crate base64;
+extern crate mime_guess;
 // gui
 extern crate tui;
 extern crate termion;
 // algos
 extern crate algos;
 extern crate rand;
+extern crate bit_vec;
 
 mod app;
 mod error;

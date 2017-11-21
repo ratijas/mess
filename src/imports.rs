@@ -11,6 +11,9 @@ pub use std::sync::mpsc::{channel, Sender, Receiver};
 pub use std::panic::{catch_unwind, AssertUnwindSafe};
 pub use std::process::exit;
 pub use std::thread;
+pub use std::time::Duration;
+
+pub use bit_vec::BitVec;
 
 pub use tui::Terminal;
 pub use tui::backend::{Backend, TermionBackend};
@@ -25,6 +28,7 @@ pub use termion::screen::AlternateScreen;
 
 pub use algos::types::*;
 pub use algos::methods::*;
+pub use algos::noise::NoiseLevel;
 
 pub use error::{Error, Result};
 
