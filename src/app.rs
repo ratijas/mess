@@ -27,8 +27,10 @@ pub struct App {
     state: State,
     /// user can't send new messages until he finishes with current.
     sending: bool,
+    /// input mode
+    mode: Mode,
 
-    input: TextField,
+    pub input: TextField,
     status: String,
 
     // users
@@ -56,6 +58,7 @@ impl App {
         App {
             state: State::Initial,
             sending: false,
+            mode: Default::default(),
 
             input: TextField::new(),
             status: String::new(),
@@ -187,7 +190,7 @@ impl App {
                         .render(t, &chunks[0]);
                 } else {
                     Paragraph::default()
-                        .text(&format_updates(&self.history))
+                        .text(&self.format_updates())
                         .raw(false)
                         .wrap(true)
                         .block(Block::default()
@@ -195,10 +198,11 @@ impl App {
                         .render(t, &chunks[0]);
                 }
                 LineEdit::default()
-                    .label("Text")
+                    .label(self.mode.name())
                     .text(&self.input.buffer)
                     .cursor(self.input.cursor)
                     .focus(!self.sending)
+                    .focus_color(self.mode.focus_color(&self))
                     .render(t, &chunks[1]);
 
                 StatusBar::default()
@@ -208,6 +212,32 @@ impl App {
             });
         t.draw()?;
         Ok(())
+    }
+
+    fn format_updates(&self) -> String {
+        let mut s = String::new();
+
+        for update in self.history.iter() {
+            match *update {
+                Update::TextUpdate { ref from, ref to, ref payload } => {
+                    let direction = if *from == self.me { ">" } else { "<" };
+                    s.push_str(&format!("{}[{} to {}]: ", direction, colorize_username(from), colorize_username(to)));
+
+                    let msg = match payload.clone().into_bytes() {
+                        Ok(vec) => match String::from_utf8(vec) {
+                            Ok(s) => escape_brackets(s),
+                            Err(_) => "{red UTF-8 error}".into(),
+                        },
+                        Err(_) => "{red decoding error}".into(),
+                    };
+                    s.push_str(&msg);
+                    s.push_str("\n");
+                }
+                _ => {}
+            }
+        }
+
+        s
     }
 
     fn handle_app_event(&mut self, event: AppEvent) -> Result<()> {
@@ -249,9 +279,10 @@ impl App {
         match event {
             Event::Key(Key::Esc) => self.status.clear(),
             Event::Key(Key::Ctrl('c')) => self.state = State::Exit,
+            Event::Key(Key::Ctrl('l')) => { /* redraw */ }
+            Event::Key(Key::Ctrl('o')) => self.switch_mode(),
             Event::Key(Key::F(5)) => self.history.clear(),
             Event::Key(Key::Char('\n')) => self.send()?,
-            Event::Key(Key::Ctrl('l')) => { /* redraw */ }
             _ => {
                 if !self.sending {
                     self.input.handle_event(event);
@@ -264,12 +295,13 @@ impl App {
     fn send(&mut self) -> Result<()> {
         self.sending = true;
 
-        if self.input.buffer.len() == 0 {
-            self.events.0.send(AppEvent::SendFailed { reason: "Message is empty".into() })?;
-            return Ok(());
-        }
-
-        let content = self.input.buffer.clone();
+        let content = match self.mode.data_for_input(&self.input.buffer) {
+            Ok(content) => content,
+            Err(e) => {
+                self.events.0.send(AppEvent::SendFailed { reason: format!("{:?}", e) })?;
+                return Ok(());
+            }
+        };
         let me = self.me.clone();
         let peer = self.peer.clone();
 
@@ -283,7 +315,7 @@ impl App {
                 from: me,
                 to: peer,
                 payload: Data::from_bytes(
-                    content.as_bytes(),
+                    content.as_slice(),
                     Compression::Rle,
                     Coding::Hamming,
                 ).unwrap(),
@@ -310,31 +342,14 @@ impl App {
         });
         Ok(())
     }
-}
 
-fn format_updates(updates: &[Update]) -> String {
-    let mut s = String::new();
-
-    for update in updates {
-        match *update {
-            Update::TextUpdate { ref from, ref to, ref payload } => {
-                s.push_str(&format!("[{} to {}]: ", colorize_username(from), colorize_username(to)));
-
-                let msg = match payload.clone().into_bytes() {
-                    Ok(vec) => match String::from_utf8(vec) {
-                        Ok(s) => escape_brackets(s),
-                        Err(_) => "{red UTF-8 error}".into(),
-                    },
-                    Err(_) => "{red decoding error}".into(),
-                };
-                s.push_str(&msg);
-                s.push_str("\n");
-            }
-            _ => {}
-        }
+    fn switch_mode(&mut self) {
+        let mode = match self.mode {
+            Mode::File => Mode::Text,
+            Mode::Text => Mode::File,
+        };
+        self.mode = mode;
     }
-
-    s
 }
 
 fn escape_brackets(s: String) -> String {

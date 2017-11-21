@@ -1,5 +1,7 @@
-pub use std::io;
+pub use std::io::{self, Read, Write};
 pub use std::env;
+
+pub use std::fs::{self, File};
 
 pub use std::cell::RefCell;
 pub use std::sync::{Arc, Weak};
@@ -27,3 +29,5 @@ pub use connection::Connection;
 
 pub use gui::view::*;
 pub use gui::control::*;
+
+pub use mode::Mode;

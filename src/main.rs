@@ -20,6 +20,7 @@ mod imports;
 mod connection;
 mod gui;
 mod logo;
+mod mode;
 
 
 // std

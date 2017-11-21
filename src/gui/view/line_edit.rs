@@ -1,14 +1,25 @@
 use imports::*;
 
-#[derive(Default)]
 pub struct LineEdit<'a> {
     label: &'a str,
     text: &'a str,
     /// byte cursor
     cursor: usize,
     focus: bool,
+    focus_color: Color,
 }
 
+impl<'a> Default for LineEdit<'a> {
+    fn default() -> Self {
+        LineEdit {
+            label: "",
+            text: "",
+            cursor: 0,
+            focus: false,
+            focus_color: Color::Reset,
+        }
+    }
+}
 
 impl<'a> LineEdit<'a> {
     pub fn label(mut self, label: &'a str) -> LineEdit<'a> {
@@ -27,13 +38,17 @@ impl<'a> LineEdit<'a> {
         self.focus = focus;
         self
     }
+    pub fn focus_color(mut self, focus_color: Color) -> LineEdit<'a> {
+        self.focus_color = focus_color;
+        self
+    }
 }
 
 impl<'a> Widget for LineEdit<'a> {
     fn draw(&self, area: &Rect, buf: &mut Buffer) {
         if area.height != 2 { panic!("LineEdit requires exactly two lines of area"); }
 
-        let focus = if self.focus { Color::Cyan } else { Color::Reset };
+        let color = if self.focus { self.focus_color } else { Color::Reset };
 
         let label_width = self.label.len() as u16 + 1;  // 1 for left border
         let mut label_area = area.clone();
@@ -46,7 +61,7 @@ impl<'a> Widget for LineEdit<'a> {
             .wrap(false)
             .raw(true)
             .block(Block::default()
-                .border_style(Style::default().fg(focus))
+                .border_style(Style::default().fg(color))
                 .borders(border::LEFT | border::BOTTOM))
             .draw(&label_area, buf);
 
@@ -59,7 +74,7 @@ impl<'a> Widget for LineEdit<'a> {
             .wrap(false)
             .raw(true)
             .block(Block::default()
-                .border_style(Style::default().fg(focus))
+                .border_style(Style::default().fg(color))
                 .borders(border::RIGHT | border::BOTTOM))
             .draw(&text_area, buf);
 
