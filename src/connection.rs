@@ -3,7 +3,6 @@
 use imports::*;
 
 use serde::Serialize;
-
 use reqwest;
 
 #[derive(Clone)]

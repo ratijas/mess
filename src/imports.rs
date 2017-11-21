@@ -8,6 +8,8 @@ pub use std::cell::RefCell;
 pub use std::sync::{Arc, Weak};
 pub use std::sync::mpsc::{channel, Sender, Receiver};
 
+pub use std::panic::{catch_unwind, AssertUnwindSafe};
+pub use std::process::exit;
 pub use std::thread;
 
 pub use tui::Terminal;
