@@ -1,10 +1,10 @@
 //! Network routines
 
+use imports::*;
+
 use serde::Serialize;
 
 use reqwest;
-
-use algos::methods::Target;
 
 #[derive(Clone)]
 pub struct Connection {
@@ -30,7 +30,8 @@ impl Connection {
 
 impl Default for Connection {
     fn default() -> Self {
-        Connection::new("0.0.0.0", 3000)
+        let host = env::var("MESS_HOST").unwrap_or("0.0.0.0".to_string());
+        Connection::new(host, 3000)
     }
 }
 
