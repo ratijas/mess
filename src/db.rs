@@ -93,12 +93,12 @@ impl File {
                  WHERE file_name = ?1
             ";
             let mut stmt = conn.prepare_cached(sql)?;
-            stmt.query_row(&[&file_name.as_ref()], |row| {
-                File {
+            stmt.query_row(params![&file_name.as_ref()], |row| {
+                Ok(File {
                     file_name: file_name.as_ref().into(),
-                    file_type: mime_guess::guess_mime_type(row.get::<_, String>(0)),
-                    file_size: row.get(1),
-                }
+                    file_type: mime_guess::guess_mime_type(row.get::<_, String>(0)?),
+                    file_size: row.get(1)?,
+                })
             })
         })
     }
@@ -110,11 +110,11 @@ impl File {
                 VALUES (?1, ?2, ?3)
             ";
             let mut stmt = conn.prepare_cached(sql)?;
-            stmt.execute(&[
+            stmt.execute(params![
                 &self.file_name,
                 &format!("{}", self.file_type),
-                &self.file_size]
-            )?;
+                &self.file_size
+            ])?;
             Ok(())
         })
     }
@@ -133,7 +133,7 @@ impl Compression {
             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             ";
             let mut stmt = conn.prepare_cached(sql)?;
-            stmt.execute(&[
+            stmt.execute(params![
                 &self.file_name,
                 &self.compression,
                 &self.compress_rate,
@@ -165,20 +165,20 @@ impl Coding {
             stmt.query_row(
                 &[&file_name, &coding_name, &noise_rate],
                 |row| {
-                    Coding {
+                    Ok(Coding {
                         file_name: file_name.into(),
                         compression: compression.into(),
                         coding_name: coding_name.into(),
                         noise_rate: noise_rate.into(),
-                        redundancy_rate: row.get(0),
-                        size_decoded: row.get(1),
-                        size_encoded: row.get(2),
-                        corrected: row.get(3),
-                        detected: row.get(4),
-                        not_corrected: row.get(5),
-                        time_encode: row.get(6),
-                        time_decode: row.get(7),
-                    }
+                        redundancy_rate: row.get(0)?,
+                        size_decoded: row.get(1)?,
+                        size_encoded: row.get(2)?,
+                        corrected: row.get(3)?,
+                        detected: row.get(4)?,
+                        not_corrected: row.get(5)?,
+                        time_encode: row.get(6)?,
+                        time_decode: row.get(7)?,
+                    })
                 })
         })
     }
@@ -201,7 +201,7 @@ impl Coding {
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             ";
             let mut stmt = conn.prepare_cached(sql)?;
-            stmt.execute(&[
+            stmt.execute(params![
                 &self.file_name,
                 &self.compression,
                 &self.coding_name,
