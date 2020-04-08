@@ -1,0 +1,31 @@
+[package]
+name = "client"
+version = "0.1.0"
+authors = ["valeev-aidar <ai.valeev@innopolis.ru>", "ratijas <gmail@ratijas.tk>"]
+
+[dependencies]
+bit-vec = "0.4.4"
+
+# network
+reqwest = { version = "0.10", features = ["blocking", "json"] }
+
+# serde
+serde = "^1.0"
+serde_derive = "^1.0"
+serde_json = "^1.0"
+base64 = "0.7.0"
+mime_guess = "1"
+
+# GUI
+termion = "1.4.0"
+
+[dependencies.tui]
+version = "0.1.3"
+default-features = false
+features = ['termion']
+
+# algos
+[dependencies.rand]
+version = "0.3"
+[dependencies.algos]
+path = "../mess-algos"
