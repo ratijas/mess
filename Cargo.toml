@@ -7,7 +7,7 @@ authors = ["valeev-aidar <ai.valeev@innopolis.ru>", "ratijas <gmail@ratijas.tk>"
 bit-vec = "0.4.4"
 
 # network
-reqwest = "0.8"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
 
 # serde
 serde = "^1.0"

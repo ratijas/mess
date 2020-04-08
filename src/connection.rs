@@ -9,7 +9,7 @@ use reqwest;
 pub struct Connection {
     host: String,
     port: u16,
-    client: reqwest::Client,
+    client: reqwest::blocking::Client,
 }
 
 impl Connection {
@@ -18,7 +18,7 @@ impl Connection {
         Connection {
             host,
             port,
-            client: reqwest::ClientBuilder::new().timeout(Duration::from_secs(5)).build().unwrap(),
+            client: reqwest::blocking::ClientBuilder::new().timeout(Duration::from_secs(5)).build().unwrap(),
         }
     }
 
@@ -35,7 +35,7 @@ impl Default for Connection {
 }
 
 impl Target for Connection {
-    fn perform<I: Serialize>(&self, name: &str, data: &I) -> reqwest::Result<reqwest::Response> {
+    fn perform<I: Serialize>(&self, name: &str, data: &I) -> reqwest::Result<reqwest::blocking::Response> {
         self.client.post(&self.url(name))
             .json(data)
             .send()
