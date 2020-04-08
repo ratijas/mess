@@ -3,6 +3,8 @@ use rand::Rng;
 
 #[derive(Copy, Clone, Debug)]
 pub enum NoiseLevel {
+    /// Clean noise-free channel
+    Clean,
     /// 1% noise
     Noise001,
     /// 5% noise
@@ -24,6 +26,7 @@ impl NoiseLevel {
 
     pub fn to_f64(self) -> f64 {
         match self {
+            NoiseLevel::Clean => 0.0,
             NoiseLevel::Noise001 => 0.01,
             NoiseLevel::Noise005 => 0.05,
             NoiseLevel::Noise015 => 0.15,
@@ -32,6 +35,7 @@ impl NoiseLevel {
     }
     pub fn to_str(self) -> &'static str {
         match self {
+            NoiseLevel::Clean => "0.00",
             NoiseLevel::Noise001 => "0.01",
             NoiseLevel::Noise005 => "0.05",
             NoiseLevel::Noise015 => "0.15",
