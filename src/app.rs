@@ -325,6 +325,22 @@ impl App {
 
             Event::Key(Key::F(5)) => self.history.clear(),
             Event::Key(Key::Char('\n')) => self.send()?,
+            Event::Key(Key::Up) => {
+                let last = self.history.iter().rev()
+                               .filter_map(|update| match *update {
+                                   Update::TextUpdate { ref payload, .. } => Some(payload),
+                                   _ => None
+                               })
+                               .next()
+                               .and_then(|payload| payload.clone().into_bytes().ok())
+                               .and_then(|bytes| String::from_utf8(bytes).ok());
+                if let Some(text) = last {
+                    if !self.sending {
+                        self.input.cursor = self.input.cursor.min(text.len());
+                        self.input.buffer = text;
+                    }
+                }
+            }
             _ => {
                 if !self.sending {
                     self.input.handle_event(event);
