@@ -1,3 +1,5 @@
+#![allow(unreachable_code, unused_mut)]
+
 #[macro_use]
 extern crate lazy_static;
 extern crate bit_vec;
@@ -35,7 +37,50 @@ mod db;
 type Result<T> = std::result::Result<T, Error>;
 
 fn main() {
+    let arg = std::env::args().nth(1).expect("expected argument: file path");
+    let path = PathBuf::from(arg);
+
+    let mut file = fs::File::open(path).unwrap();
+    let mut content: Vec<u8> = Vec::new();
+    file.read_to_end(&mut content).unwrap();
+
+    run_coding(&Hamming, "hamming", BitVec::from_bytes(&content));
+
+    return;
+
+    let db_file = db::File {
+        file_name: "".into(),
+        file_type: mime_guess::guess_mime_type(&path),
+        file_size: 0,
+    };
+    let compression = Huffman::<u8>::optimal_for(&*content);
+    live_with_it("huffman", &compression, &*content, &db_file).unwrap();
     run().unwrap();
+}
+
+fn run_coding(coding: &Coding, coding_name: &str, data: BitVec) {
+    let (encoded, time_encode) = profile(|| {
+        Ok(coding.encode(data.clone()))
+    }).unwrap();
+    let redundancy_rate = encoded.len() as f64 / (data.len()) as f64;
+
+
+    let db_coding = db::Coding {
+        file_name: String::new(),
+        compression: String::new(),
+        coding_name: coding_name.into(),
+        noise_rate: NoiseLevel::Clean.to_str().into(),
+        redundancy_rate,
+        size_decoded: data.len() as i64,
+        size_encoded: encoded.len() as i64,
+        corrected: 0,
+        detected: 0,
+        not_corrected: 0,
+        time_encode,
+        time_decode: 0,
+    };
+
+    println!("{:?}", db_coding);
 }
 
 fn run() -> Result<()> {
@@ -155,7 +200,11 @@ pub fn live_with_it(compression_name: &str,
         time_compress,
         time_decompress: None,
     };
-    c.save()?;
+    //    c.save()?;
+
+    println!("{:?}", c);
+
+    return Ok(());
 
     for &(coding, coding_name) in [
         (&Repetition3 as &Coding, "r3"),
