@@ -319,7 +319,7 @@ impl App {
             Event::Key(Key::Ctrl('l')) => { /* redraw */ }
             Event::Key(Key::Ctrl('o')) => self.switch_mode(),
 
-            Event::Key(Key::F(f)) if f >= 1 && f <= 3 => {
+            Event::Key(Key::F(f)) if f >= 1 && f <= 4 => {
                 self.adjust_noise(f);
             }
 
@@ -338,7 +338,8 @@ impl App {
         self.noise = match level {
             1 => NoiseLevel::Noise001,
             2 => NoiseLevel::Noise005,
-            _ => NoiseLevel::Noise015
+            3 => NoiseLevel::Noise015,
+            _ => NoiseLevel::Clean,
         };
         info(&self.events.0, format!("Noise level: {}", self.noise.to_str()));
     }
