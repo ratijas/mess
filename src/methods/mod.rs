@@ -47,7 +47,7 @@ pub trait Method: Serialize + DeserializeOwned {
 /// Client side trait to invoke RPC method
 pub trait ClientMethod: Method {
     fn invoke<T: Target>(&self, target: &T) -> Result<Self::Answer, ClientError>;
-    fn invoke_raw<T: Target>(&self, target: &T) -> reqwest::Result<reqwest::Response>;
+    fn invoke_raw<T: Target>(&self, target: &T) -> reqwest::Result<reqwest::blocking::Response>;
 }
 
 
@@ -62,7 +62,7 @@ pub enum ClientError {
 
 
 pub trait Target {
-    fn perform<I: Serialize>(&self, name: &str, data: &I) -> reqwest::Result<reqwest::Response>;
+    fn perform<I: Serialize>(&self, name: &str, data: &I) -> reqwest::Result<reqwest::blocking::Response>;
 }
 
 
@@ -82,7 +82,7 @@ impl<M> ClientMethod for M
     {
         debug!("request: {}", serde_json::to_string(&self).unwrap());
 
-        let mut res: reqwest::Response = self.invoke_raw(target).map_err(ClientError::ReqwestError)?;
+        let mut res = self.invoke_raw(target).map_err(ClientError::ReqwestError)?;
         let mut body = Vec::new();
         res.read_to_end(&mut body).map_err(ClientError::IoError)?;
         let body = str::from_utf8(&body).map_err(ClientError::Utf8Error)?;
@@ -99,7 +99,7 @@ impl<M> ClientMethod for M
         }
     }
 
-    fn invoke_raw<T>(&self, target: &T) -> reqwest::Result<reqwest::Response>
+    fn invoke_raw<T>(&self, target: &T) -> reqwest::Result<reqwest::blocking::Response>
         where T: Target
     {
         target.perform(M::endpoint(), &self)
