@@ -1,0 +1,8 @@
+[workspace]
+
+members = [
+    "mess-algos",
+    "mess-client",
+    "mess-server",
+    "mess-stats",
+]

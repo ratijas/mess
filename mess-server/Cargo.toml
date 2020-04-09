@@ -1,5 +1,5 @@
 [package]
-name = "server"
+name = "mess-server"
 version = "0.1.0"
 authors = ["valeev-aidar <ai.valeev@innopolis.ru>", "ivan tkachenko <me@ratijas.tk>"]
 
@@ -20,5 +20,4 @@ serde_derive = "^1.0"
 serde_json = "^1.0"
 base64 = "0.7.0"
 
-[dependencies.algos]
-path = "../mess-algos"
+mess-algos = { path = "../mess-algos" }

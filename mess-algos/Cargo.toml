@@ -1,7 +1,10 @@
 [package]
-name = "algos"
+name = "mess-algos"
 version = "0.1.0"
-authors = ["ivan tkachenko <ratijas@users.noreply.github.com>"]
+authors = ["ivan tkachenko <me@ratijas.tk>"]
+
+[lib]
+name = "algos"
 
 [dependencies]
 # log
